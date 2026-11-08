@@ -1,0 +1,18 @@
+--- a/src/internal/firewall/firewall.go
++++ b/src/internal/firewall/firewall.go
+@@ -377,7 +377,14 @@
+ 		loopback := isLoopback(ip)
+ 		unlockPath := strings.HasPrefix(urlPath, "/api/firewall/unlock") ||
+ 			strings.HasPrefix(urlPath, "/api/firewall/unseal")
+-		allowOps := urlPath == "/healthz" ||
++		// V-38 修复：封存期间若连认证端点也全封，任何未持有旧 JWT 的
++		// 运维都无法登录再解锁 —— 攻击一次就造成永久性自锁 DoS。开放
++		// 回环专用恢复通道（login/register/refresh 仅限本机），远程攻击
++		// 者仍然完全无法认证，保护语义不变。
++		authRecovery := loopback && (urlPath == "/api/auth/login" ||
++			urlPath == "/api/auth/register" ||
++			urlPath == "/api/auth/refresh")
++		allowOps := urlPath == "/healthz" || authRecovery ||
+ 			(loopback && (strings.HasPrefix(urlPath, "/api/firewall/status") ||
+ 				strings.HasPrefix(urlPath, "/api/firewall/events") ||
+ 				strings.HasPrefix(urlPath, "/api/firewall/verify"))) || unlockPath

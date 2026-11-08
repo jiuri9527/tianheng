@@ -1,0 +1,3 @@
+=== [C] 删回复越权（J2 删 J1 帖子下 J1 的回复）===
+  J2 删 J1 的回复（J2 非帖子作者也非回复作者）→ HTTP ��应 403）{"error":{"message":"仅帖子作者可执行该操作（天衡无管理员角色）","type":"permission_error","code":"forbidden","request_id":"42066f2dbc8c452fad4cfd94"}}
+  J1 删自己回复 → HTTP ��应 200）

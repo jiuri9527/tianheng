@@ -1,0 +1,3 @@
+=== [A] 论坛编辑越权（J2 编辑 J1 的帖子）===
+  J2 编辑 J1 帖子 → HTTP ��应 403）{"error":{"message":"仅帖子作者可执行该操作（天衡无管理员角色）","type":"permission_error","code":"forbidden","request_id":"2780f0b918eb45980982b9e1"}}
+  J1 编辑自己 → HTTP ��应 200）

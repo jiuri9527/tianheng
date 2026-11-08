@@ -1,0 +1,47 @@
+diff --git a/kernel/streampipe.go b/kernel/streampipe.go
+--- a/kernel/streampipe.go
++++ b/kernel/streampipe.go
+@@ -72,6 +72,9 @@
+ 
+ 		chunk, err := br.ReadSlice('\n')
+ 		if len(chunk) > 0 {
++			// SSE 把 \r 也视为行分隔符；剔除裸 CR，防止恶意上游向下游注入
++			// 伪造的 data:/event: 帧（CRLF 归一为 LF，不影响正常 SSE）。
++			chunk = bytes.ReplaceAll(chunk, []byte("\r"), nil)
+ 			if _, werr := w.Write(chunk); werr != nil {
+ 				return werr
+ 			}
+diff --git a/kernel/limiter.go b/kernel/limiter.go
+--- a/kernel/limiter.go
++++ b/kernel/limiter.go
+@@ -63,12 +63,29 @@
+ 	now := time.Now().UnixNano()
+ 	b, ok := s.buckets[key]
+ 	if !ok {
++		// 桶表基数上限：key 若可控，无界 map 会导致内存耗尽。
++		if len(s.buckets) >= 100000 {
++			return false, nil
++		}
+ 		b = &lbucket{tokens: l.burst, last: now}
+ 		s.buckets[key] = b
+ 	}
+ 	elapsed := now - b.last
+ 	if elapsed > 0 {
+-		b.tokens += elapsed * l.rate / int64(time.Second)
++		// 限制单次补充窗口，避免 elapsed*rate 溢出 int64 导致令牌数回绕
++		// （限流被绕过或该 key 永久拒绝）。
++		if elapsed > int64(time.Hour) {
++			elapsed = int64(time.Hour)
++		}
++		rate := l.rate
++		if rate > 1e9 {
++			rate = 1e9 // 限定整数乘法上界
++		}
++		// 拆分整秒与亚秒分别计算：保留 <1s 的补充精度（F9），
++		// elapsed 已钳制到 1h、rate<=1e9，两段乘积都不溢出 int64。
++		whole := elapsed / int64(time.Second)
++		frac := elapsed % int64(time.Second)
++		b.tokens += whole*rate + (frac*rate)/int64(time.Second)
+ 		if b.tokens > l.burst {
+ 			b.tokens = l.burst
+ 		}

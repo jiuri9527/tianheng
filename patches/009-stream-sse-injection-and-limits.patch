@@ -1,0 +1,109 @@
+diff --git a/src/internal/adapter/stream.go b/src/internal/adapter/stream.go
+--- a/src/internal/adapter/stream.go
++++ b/src/internal/adapter/stream.go
+@@ -9,6 +9,25 @@
+ 	"time"
+ )
+ 
++const (
++	maxSSEEventBytes = 4 << 20
++	maxSSEDataBytes  = 4 << 20
++)
++
++// sanitizeRawData 剔除上游 data 行中的 CR/LF（SSE 把 \r 也视为行分隔符，
++// 恶意上游可借此向下游注入伪造的 data:/event: 帧），并校验为合法 JSON。
++func sanitizeRawData(s string) (string, bool) {
++	s = strings.ReplaceAll(s, "\r", "")
++	s = strings.ReplaceAll(s, "\n", "")
++	if len(s) > maxSSEDataBytes {
++		return "", false
++	}
++	if !json.Valid([]byte(s)) {
++		return "", false
++	}
++	return s, true
++}
++
+ // ---------- 通用 SSE 事件读取 ----------
+ 
+ type sseEvent struct {
+@@ -28,6 +47,7 @@
+ 	event := ""
+ 	var dataLines []string
+ 	sawAny := false
++	dataBytes := 0
+ 	for sc.Scan() {
+ 		line := strings.TrimSuffix(sc.Text(), "\r")
+ 		if line == "" {
+@@ -43,12 +63,18 @@
+ 		if strings.HasPrefix(line, "event:") {
+ 			event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+ 		} else if strings.HasPrefix(line, "data:") {
+-			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
++			d := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
++			dataBytes += len(d)
++			dataLines = append(dataLines, d)
+ 		} else if strings.HasPrefix(line, "id:") || strings.HasPrefix(line, "retry:") {
+ 			// 忽略 id/retry
+ 		} else {
+ 			// 无前缀的数据行也纳入
++			dataBytes += len(line)
+ 			dataLines = append(dataLines, line)
++		}
++		if dataBytes > maxSSEEventBytes {
++			return sseEvent{event: "error", data: "SSE event exceeds size limit"}, true
+ 		}
+ 	}
+ 	if sawAny {
+@@ -72,6 +98,9 @@
+ 		ev, ok := nextEvent(it.sc)
+ 		if !ok {
+ 			it.exhausted = true
++			if err := it.sc.Err(); err != nil {
++				return &UnifiedChunk{Err: fmt.Errorf("SSE 扫描失败: %w", err)}
++			}
+ 			return &UnifiedChunk{Done: true}
+ 		}
+ 		if ev.event == "error" {
+@@ -121,6 +150,7 @@
+ 		var pt, ct int
+ 		_ = json.Unmarshal(u["prompt_tokens"], &pt)
+ 		_ = json.Unmarshal(u["completion_tokens"], &ct)
++		pt, ct = safeUsageInt(pt), safeUsageInt(ct)
+ 		uc.Usage = &Usage{PromptTokens: pt, CompletionTokens: ct, TotalTokens: pt + ct}
+ 	}
+ 	return uc
+@@ -170,6 +200,9 @@
+ 		ev, ok := nextEvent(it.sc)
+ 		if !ok {
+ 			it.exhausted = true
++			if err := it.sc.Err(); err != nil {
++				return &UnifiedChunk{Err: fmt.Errorf("SSE 扫描失败: %w", err)}
++			}
+ 			return &UnifiedChunk{Done: true}
+ 		}
+ 		switch ev.event {
+@@ -199,6 +232,10 @@
+ 				ContentBlock json.RawMessage `json:"content_block"`
+ 			}
+ 			if err := json.Unmarshal([]byte(ev.data), &d); err != nil {
++				continue
++			}
++			// 上游可控 index 不得无限扩张内部状态（内存耗尽）。
++			if d.Index < 0 || d.Index > 1024 || len(it.blockType) > 1024 {
+ 				continue
+ 			}
+ 			var cb map[string]json.RawMessage
+@@ -290,7 +327,11 @@
+ 		return []byte("data: [DONE]\n\n")
+ 	}
+ 	if uc.Raw != "" && uc.Content == "" && len(uc.ToolCalls) == 0 && uc.FinishReason == "" {
+-		return []byte("data: " + uc.Raw + "\n\n")
++		raw, ok := sanitizeRawData(uc.Raw)
++		if !ok {
++			return []byte("data: {}\n\n")
++		}
++		return []byte("data: " + raw + "\n\n")
+ 	}
+ 	id, model := uc.ID, uc.Model
+ 	if id == "" {

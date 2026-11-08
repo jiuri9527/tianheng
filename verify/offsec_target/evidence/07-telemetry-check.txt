@@ -1,0 +1,2 @@
+TELEMETRY_KEYS= ['available', 'avg_ttft_ms', 'bucket_seconds', 'completion_tokens', 'error_count', 'generated_at', 'groups', 'max_ttft_ms', 'peak_qps', 'prompt_tokens', 'qps', 'qps_window_seconds', 'series', 'source', 'stream_requests', 'success_count', 'success_rate', 'total_requests', 'total_tokens', 'ttft_sample_count', 'window_seconds']
+PLAINTEXT_LEAK_KEYS= NONE

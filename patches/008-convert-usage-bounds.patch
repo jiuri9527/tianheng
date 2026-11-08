@@ -1,0 +1,57 @@
+diff --git a/src/internal/adapter/convert.go b/src/internal/adapter/convert.go
+--- a/src/internal/adapter/convert.go
++++ b/src/internal/adapter/convert.go
+@@ -5,6 +5,16 @@
+ 	"strings"
+ 	"time"
+ )
++
++// maxUsageTokens 上游 usage 字段不可信：钳制到合法范围，防止负数/溢出污染计费。
++const maxUsageTokens = 1 << 31
++
++func safeUsageInt(n int) int {
++	if n < 0 || n > maxUsageTokens {
++		return 0
++	}
++	return n
++}
+ 
+ // ---------- finish_reason / stop_reason 映射 ----------
+ 
+@@ -41,7 +51,8 @@
+ 
+ // AnthropicUsageToOpenAI 把 input_tokens/output_tokens 映射为 OpenAI usage。
+ func AnthropicUsageToOpenAI(inputTokens, outputTokens int) Usage {
+-	return Usage{PromptTokens: inputTokens, CompletionTokens: outputTokens, TotalTokens: inputTokens + outputTokens}
++	in, out := safeUsageInt(inputTokens), safeUsageInt(outputTokens)
++	return Usage{PromptTokens: in, CompletionTokens: out, TotalTokens: in + out}
+ }
+ 
+ // ---------- tools 双向映射 ----------
+@@ -568,7 +579,7 @@
+ 		_ = json.Unmarshal(u["input_tokens"], &inTok)
+ 		_ = json.Unmarshal(u["output_tokens"], &outTok)
+ 	}
+-	usage := AnthropicUsageToOpenAI(inTok, outTok)
++	usage := AnthropicUsageToOpenAI(safeUsageInt(inTok), safeUsageInt(outTok))
+ 	resp := map[string]interface{}{
+ 		"id": id, "object": "chat.completion", "created": time.Now().Unix(), "model": model,
+ 		"choices": []interface{}{map[string]interface{}{
+@@ -634,7 +645,7 @@
+ 		"id": id, "type": "message", "role": "assistant", "model": model,
+ 		"content": content, "stop_reason": MapFinishToStop(finish),
+ 		"stop_sequence": nil,
+-		"usage": map[string]interface{}{"input_tokens": pt, "output_tokens": ct},
++		"usage": map[string]interface{}{"input_tokens": safeUsageInt(pt), "output_tokens": safeUsageInt(ct)},
+ 	}
+ 	return json.Marshal(resp)
+ }
+@@ -675,6 +686,8 @@
+ 	_ = json.Unmarshal(u["prompt_tokens"], &pt)
+ 	_ = json.Unmarshal(u["completion_tokens"], &ct)
+ 	_ = json.Unmarshal(u["total_tokens"], &tt)
++	pt, ct = safeUsageInt(pt), safeUsageInt(ct)
++	tt = safeUsageInt(tt)
+ 	if tt == 0 {
+ 		tt = pt + ct
+ 	}

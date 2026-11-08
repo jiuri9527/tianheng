@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   llm-hub 设计令牌 · 双主题
+   真实首页 (data/openrouter-home.html) 只暴露语义 token 名与 hsl(var(--x)) 引用，
+   具体数值在被外链的 CSS chunk 中（未包含在抓取里）。以下 RGB 三元组是本设计规范
+   的定义值：暖白底 / 近黑字 / 单一克制强调色，配合 rgb(var(--x) / <alpha-value>)
+   以支持真实首页出现的 bg-warning/12、border-info/14、text-muted-foreground/50。
+   ========================================================================== */
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 250 249 246; /* #FAF9F6 暖白 */
+    --foreground: 24 27 32; /* #181B20 近黑 */
+    --heading: 17 20 24; /* #111418 标题 */
+    --card: 255 255 255; /* #FFFFFF */
+    --card-foreground: 24 27 32;
+    --card-hover: 244 242 237; /* #F4F2ED */
+    --muted: 241 239 234; /* #F1EFEA */
+    --muted-foreground: 108 112 120; /* #6C7078 */
+    --primary: 79 70 229; /* #4F46E5 克制靛蓝（唯一品牌强调色） */
+    --primary-foreground: 255 255 255;
+    --accent: 238 237 249; /* #EEEDF9 */
+    --accent-foreground: 45 40 130; /* #2D2882 */
+    --border: 229 226 220; /* #E5E2DC */
+    --input: 214 211 204; /* #D6D3CC */
+    --input-bg: 255 255 255;
+    --focus-border: 79 70 229; /* #4F46E5 */
+    --info: 47 111 237; /* #2F6FED */
+    --info-text: 29 78 216; /* #1D4ED8 */
+    --positive: 14 159 110; /* #0E9F6E */
+    --positive-text: 4 120 87; /* #047857 */
+    --warning: 194 120 3; /* #C27803 */
+    --warning-text: 146 92 4; /* #925C04 */
+    --negative: 224 36 36; /* #E02424 */
+    --negative-text: 185 28 28; /* #B91C1C */
+
+    /* 真实首页预载：gordita_bold-*.woff2 + PlusJakartaSans_VariableFont-*.woff2 */
+    --font-brand: "Gordita", "Plus Jakarta Sans", "Inter", ui-sans-serif,
+      system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui,
+      -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo,
+      Consolas, monospace;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --background: 12 13 16; /* #0C0D10 */
+    --foreground: 238 238 236; /* #EEEEEC */
+    --heading: 247 247 245; /* #F7F7F5 */
+    --card: 21 23 28; /* #15171C */
+    --card-foreground: 238 238 236;
+    --card-hover: 30 33 39; /* #1E2127 */
+    --muted: 30 33 39; /* #1E2127 */
+    --muted-foreground: 148 153 163; /* #9499A3 */
+    --primary: 129 124 255; /* #817CFF 深色下提亮，保持对比度 */
+    --primary-foreground: 12 13 16;
+    --accent: 35 34 58; /* #23223A */
+    --accent-foreground: 199 196 255; /* #C7C4FF */
+    --border: 42 46 54; /* #2A2E36 */
+    --input: 58 63 72; /* #3A3F48 */
+    --input-bg: 17 19 23; /* #111317 */
+    --focus-border: 148 143 255; /* #948FFF */
+    --info: 96 147 255; /* #6093FF */
+    --info-text: 147 179 255; /* #93B3FF */
+    --positive: 52 199 145; /* #34C791 */
+    --positive-text: 110 224 180; /* #6EE0B4 */
+    --warning: 232 162 38; /* #E8A226 */
+    --warning-text: 245 190 90; /* #F5BE5A */
+    --negative: 244 91 91; /* #F45B5B */
+    --negative-text: 250 140 140; /* #FA8C8C */
+  }
+
+  * {
+    border-color: rgb(var(--border));
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: rgb(var(--heading));
+  }
+
+  ::selection {
+    background: rgb(var(--primary) / 0.24);
+  }
+
+  /* outline-hidden：保留 forced-colors 模式下的可见焦点（Tailwind 语义） */
+  :focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  /* 细滚动条 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--muted-foreground) / 0.28);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* 与真实首页 focus-visible:shadow-focus / focus-visible:border-focus-border 对齐 */
+  .focus-ring {
+    @apply outline-hidden transition-[box-shadow,border-color,background-color] duration-quick ease-smooth-out;
+  }
+  .focus-ring:focus-visible {
+    box-shadow: 0 0 0 2px rgb(var(--background)),
+      0 0 0 4px rgb(var(--focus-border) / 0.9);
+    border-color: rgb(var(--focus-border));
+  }
+
+  .card-surface {
+    @apply rounded-lg border border-border bg-card text-card-foreground shadow-card;
+  }
+
+  .hairline {
+    @apply border border-border/60;
+  }
+}
+
+@layer utilities {
+  /* Tailwind 3.4 未内置 outline-hidden（v4 才有）；按真实首页语义在此补齐，
+     保留 forced-colors 模式下可见的透明描边，配合 focus-visible:shadow-focus 使用。 */
+  .outline-hidden {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  /* 网格背景：路由可视化与 hero 底纹 */
+  .bg-grid {
+    background-image: linear-gradient(
+        to right,
+        rgb(var(--border) / 0.55) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgb(var(--border) / 0.55) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .bg-dots {
+    background-image: radial-gradient(
+      rgb(var(--muted-foreground) / 0.35) 1px,
+      transparent 1px
+    );
+    background-size: 18px 18px;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 无障碍：尊重系统减弱动效（对应真实首页 motion-reduce:transition-none） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

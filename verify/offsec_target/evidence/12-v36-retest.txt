@@ -1,0 +1,4 @@
+=== 12-锁定后攻击者远程解锁阻断（V-36 修复后语义）===
+（本机即回环，靶场上 unlock 应 200=本机运维通道；非回环 403 由 tests/superuser_test.go do() RemoteAddr=192.0.2.1 真实断言）
+--- PASS: TestAllUsersAreSuperusers (1.35s)
+PASS

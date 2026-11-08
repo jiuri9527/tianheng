@@ -1,0 +1,97 @@
+diff --git a/src/internal/auth/auth.go b/src/internal/auth/auth.go
+--- a/src/internal/auth/auth.go
++++ b/src/internal/auth/auth.go
+@@ -9,6 +9,7 @@
+ 	"errors"
+ 	"fmt"
+ 	"strings"
++	"sync"
+ 	"time"
+ 
+ 	"llm-hub/src/internal/config"
+@@ -56,9 +57,16 @@
+ 	if !hmac.Equal(want, got) {
+ 		return nil, errors.New("JWT 签名不匹配")
+ 	}
+-	// 强制校验 header 里的 alg，避免算法混淆
+-	hdr, err := base64.RawURLEncoding.DecodeString(parts[0])
+-	if err != nil || !strings.Contains(string(hdr), `"alg":"HS256"`) {
++	// 严格解析 header：alg 必须精确等于 HS256（strings.Contains 可被伪造字段绕过）
++	hdrBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
++	if err != nil {
++		return nil, errors.New("JWT header 编码错误")
++	}
++	var hdr struct {
++		Alg string `json:"alg"`
++		Typ string `json:"typ"`
++	}
++	if err := json.Unmarshal(hdrBytes, &hdr); err != nil || hdr.Alg != "HS256" {
+ 		return nil, errors.New("JWT alg 非 HS256")
+ 	}
+ 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+@@ -112,8 +120,14 @@
+ 	return &Tokens{AccessToken: access, RefreshToken: refresh, TokenType: "Bearer", ExpiresIn: int64(s.ttl.Seconds())}, nil
+ }
+ 
+-// Register 注册用户；首个注册用户自动成为 admin；可选 bootstrap 管理员邮箱。
++// registerMu 串行化注册，消除「首个用户自动 admin」的 check-then-act 竞态。
++var registerMu sync.Mutex
++
++// Register 注册用户；首个注册用户自动成为 admin。
+ func (s *Service) Register(email, password string, registrationOpen bool, adminEmail string) (*store.User, *Tokens, error) {
++	registerMu.Lock()
++	defer registerMu.Unlock()
++	_ = adminEmail // 禁止按自报邮箱提权：bootstrap 管理员由装配层在启动时创建
+ 	email = strings.ToLower(strings.TrimSpace(email))
+ 	if email == "" || !strings.Contains(email, "@") {
+ 		return nil, nil, errors.New("邮箱不合法")
+@@ -132,7 +146,7 @@
+ 		return nil, nil, err
+ 	}
+ 	role := "user"
+-	if s.store.CountUsers() == 0 || (adminEmail != "" && strings.EqualFold(email, adminEmail)) {
++	if s.store.CountUsers() == 0 {
+ 		role = "admin"
+ 	}
+ 	now := time.Now()
+@@ -151,17 +165,25 @@
+ 	return u, tok, nil
+ }
+ 
++// errBadCredentials 统一登录失败错误，避免账号/状态枚举。
++var errBadCredentials = errors.New("邮箱或口令错误")
++
++// dummyPasswordHash 是合法格式的占位哈希，用于对不存在用户执行等量 KDF 运算，
++// 消除通过响应时间枚举账号。
++var dummyPasswordHash = "120000$" + strings.Repeat("0", 32) + "$" + strings.Repeat("0", 64)
++
+ // Login 校验口令并签发令牌。
+ func (s *Service) Login(email, password string) (*store.User, *Tokens, error) {
+ 	u, ok := s.store.GetUserByEmail(strings.ToLower(strings.TrimSpace(email)))
+ 	if !ok {
+-		return nil, nil, errors.New("用户不存在")
++		_ = crypto.VerifyPassword(dummyPasswordHash, password)
++		return nil, nil, errBadCredentials
+ 	}
+ 	if u.Status != "active" {
+-		return nil, nil, errors.New("用户被禁用")
++		return nil, nil, errBadCredentials
+ 	}
+ 	if !crypto.VerifyPassword(u.PasswordHash, password) {
+-		return nil, nil, errors.New("口令错误")
++		return nil, nil, errBadCredentials
+ 	}
+ 	tok, err := s.issue(u)
+ 	if err != nil {
+@@ -221,7 +243,7 @@
+ 	if err != nil {
+ 		return err
+ 	}
+-	u.PasswordHash = hash
+-	u.UpdatedAt = time.Now().Unix()
+-	return s.store.UpdateUser(u) // 原地修改已生效，这里仅确认用户存在
+-}
++	// 锁内更新，避免对共享 *User 指针无锁写入（与 store.Save / AdjustQuota 竞态）。
++	s.store.SetPasswordHash(userID, hash)
++	return nil
++}

@@ -1,0 +1,197 @@
+====================================================================
+ verify/e2e.sh · 端到端真实执行核实
+====================================================================
+ ROOT        : /Users/jiuri/Desktop/Tianheng
+ BASE        : http://127.0.0.1:18099
+ PORT        : 18099
+ EVIDENCE    : /tmp/llm-hub-e2e-evidence.bnO2rW
+ go          : go version go1.27.2 darwin/arm64
+ curl        : curl 8.7.1 (x86_64-apple-darwin26.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.69.0
+ python3     : Python 3.9.6
+ TIMESTAMP   : 2026-11-07 21:55:20 +0800
+====================================================================
+
+--------------------------------------------------------------------
+ [S0] go build ./src/cmd/server  (真实编译，输出原样保留)
+--------------------------------------------------------------------
+ BUILD_EXIT  : 0
+ BUILD_STDOUT: 
+ BUILD_STDERR: 
+ BUILD_OK    : True  BIN=/tmp/llm-hub-e2e-server-38674  bytes=12048258
+
+--------------------------------------------------------------------
+ [S1] 后台启动服务并等待 /healthz（最多 20 次 × 0.5s）
+--------------------------------------------------------------------
+ SERVER_PID  : 38698
+ SERVER_LOG  : /tmp/llm-hub-e2e-server-38674.log
+ READY       : True (attempt 1, /healthz=200)
+ SERVER_UP   : True
+ SERVER_LOG_TAIL:
+    2026/11/07 21:55:21 已引导管理员账号: e2e-admin@llm-hub.local
+    llm-hub 启动于 :18099，真实模型池来源 data/models-real.json（460 条）
+
+--------------------------------------------------------------------
+ [S2] GET /healthz · GET /metrics · /api/* 无效令牌 401
+--------------------------------------------------------------------
+  [CHECK 1] healthz
+    REQUEST     : GET /healthz
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"channels":0,"discovered_models":0,"real_models":460,"real_models_source":"data/models-real.json","status":"ok","time":1794059721,"users":1} 
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/01_healthz.body
+  [CHECK 2] metrics
+    REQUEST     : GET /metrics
+    HTTP_STATUS : 200
+    BODY_SNIPPET: # HELP llmhub_requests_total Total requests by model/channel/status. # TYPE llmhub_requests_total counter # HELP llmhub_ttft_seconds Time to first token (sum/count). # TYPE llmhub_ttft_seconds summary llmhub_ttft_seconds_sum 0.000000 llmhub_ttft_seconds_count 0 # HELP llmhub_tokens_total Total tokens by type. # TYPE ll
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/02_metrics.body
+  [CHECK 3] api_me_invalid_token
+    REQUEST     : GET /api/me
+    HTTP_STATUS : 401
+    BODY_SNIPPET: {"error":{"message":"JWT 格式错误","type":"invalid_request_error","code":"invalid_token","request_id":"db78488ad63f39b908850c5c"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/03_api_me_invalid_token.body
+
+--------------------------------------------------------------------
+ [S3] 注册 / 登录 / 创建 sk- 令牌（主令牌 rpm=1000 + 限流专用 rpm=2）
+--------------------------------------------------------------------
+  [CHECK 4] auth_register
+    REQUEST     : POST /api/auth/register
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"tokens":{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNjA1NzkyZjU2ZTZjN2ZjMjk3MzVkMjFiIiwicm9sZSI6InVzZXIiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk0MTQ2MTIxLCJpYXQiOjE3OTQwNTk3MjF9.NadL3ihtys6a8EoVToSPwnBEXSKeou0UD-R67Z7PVkw","refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNjA1
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/04_auth_register.body
+  [CHECK 5] auth_login
+    REQUEST     : POST /api/auth/login
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"tokens":{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNjA1NzkyZjU2ZTZjN2ZjMjk3MzVkMjFiIiwicm9sZSI6InVzZXIiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk0MTQ2MTIyLCJpYXQiOjE3OTQwNTk3MjJ9.NIzFE86TQSxLrFjnGXRnQwyFBaN-UGBH8cC_9Dk1JO0","refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNjA1
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/05_auth_login.body
+  JWT_ACQUIRED  : True (len=217)
+  [CHECK 6] tokens_create_main
+    REQUEST     : POST /api/tokens
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"allowed_models":[],"created_at":1794059722,"expires_at":0,"id":"tok_3aa83de2f54b2fe82dfca9b9","ip_allowlist":null,"key_hint":"****9c74","last_used_at":0,"max_concurrency":8,"name":"e2e-main","quota_usd":0,"rpm":1000,"status":"active","token":"sk-4927ee45ab0cf62a16932c7959f69c74","tpm":1000000,"used_usd":0} 
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/06_tokens_create_main.body
+  [CHECK 7] tokens_create_rpm
+    REQUEST     : POST /api/tokens
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"allowed_models":[],"created_at":1794059722,"expires_at":0,"id":"tok_3a842e871dde66054057a379","ip_allowlist":null,"key_hint":"****6092","last_used_at":0,"max_concurrency":8,"name":"e2e-rpm","quota_usd":0,"rpm":2,"status":"active","token":"sk-190a2bf2e9befedac67edb14d9926092","tpm":200000,"used_usd":0} 
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/07_tokens_create_rpm.body
+  SK_ACQUIRED    : True (len=35)
+  SK_RPM_ACQUIRED: True (len=35)
+
+--------------------------------------------------------------------
+ [S4] GET /v1/models（真实模型 + 数量核对 + id ∈ data/models-real.json）
+--------------------------------------------------------------------
+  [CHECK 8] v1_models
+    REQUEST     : GET /v1/models
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"data":[{"architecture":{"modality":"text-\u003etext","input_modalities":["text"],"output_modalities":["text"],"tokenizer":"Other","instruct_type":null},"canonical_slug":"liquid/lfm-3-1.7b-20261106","context_length":262144,"created":1794009477,"default_parameters":{"temperature":0.1,"top_k":50,"repetition_penalty":1.1
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/08_v1_models.body
+  TRUTH_MODELS     : 460
+  RETURNED_MODELS  : 460
+  FIRST_3_IDS      : ['liquid/lfm-3-1.7b', 'liquid/lfm-3-1.7b:free', 'google/gemini-omni-1.2-flash']
+  NOT_IN_REAL      : 0 []
+  VERDICT          : PASS(全部真实且非空)
+
+--------------------------------------------------------------------
+ [S5] POST /v1/chat/completions（无上游凭据：统一 upstream_error，响应体不含伪造模型输出）
+--------------------------------------------------------------------
+  MODEL_USED (真实 id，取自 data/models-real.json): liquid/lfm-3-1.7b
+  [CHECK 9] v1_chat_completions
+    REQUEST     : POST /v1/chat/completions
+    HTTP_STATUS : 502
+    BODY_SNIPPET: {"error":{"message":"no usable upstream channel for model \"liquid/lfm-3-1.7b\"","type":"upstream_error","code":"no_upstream_channel","request_id":"944fb8b0b001dd79132e421b"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/09_v1_chat_completions.body
+  ERROR_TYPE_FIELD : upstream_error
+  HAS_UPSTREAM_ERROR   : True
+  HAS_CHOICES_KEY      : False
+  HAS_CONTENT_KEY      : False
+  FABRICATED_OUTPUT    : False
+  VERDICT              : PASS(统一 upstream_error 且无伪造输出)
+
+--------------------------------------------------------------------
+ [S6] POST /v1/messages（Anthropic Messages 兼容入口，无上游凭据）
+--------------------------------------------------------------------
+  [CHECK 10] v1_messages
+    REQUEST     : POST /v1/messages
+    HTTP_STATUS : 502
+    BODY_SNIPPET: {"error":{"message":"no usable upstream channel for model \"liquid/lfm-3-1.7b\"","type":"upstream_error","code":"no_upstream_channel","request_id":"57710c6013a4ae9e704a68d4"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/10_v1_messages.body
+  HAS_UPSTREAM_ERROR   : True
+  HAS_CHOICES_KEY      : False
+  HAS_CONTENT_KEY      : False
+  FABRICATED_OUTPUT    : False
+  VERDICT              : PASS(统一 upstream_error 且无伪造输出)
+
+--------------------------------------------------------------------
+ [S7] RPM 限流（限流专用令牌 rpm=2，连续 8 次 GET /v1/models 记录真实状态码）
+--------------------------------------------------------------------
+  RPM_REQ_1 : HTTP 200
+  RPM_REQ_2 : HTTP 200
+  RPM_REQ_3 : HTTP 429
+  RPM_REQ_4 : HTTP 429
+  RPM_REQ_5 : HTTP 429
+  RPM_REQ_6 : HTTP 429
+  RPM_REQ_7 : HTTP 429
+  RPM_REQ_8 : HTTP 429
+  HTTP_429_COUNT : 6
+  VERDICT        : PASS(观察到 429)
+
+--------------------------------------------------------------------
+ [S8] SSRF 防护（提交内网/回环/元数据 base_uri 必须被拒）
+--------------------------------------------------------------------
+  [CHECK 11] ssrf_1
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"base_uri 校验失败: 拒绝内网/回环/元数据地址 127.0.0.1（loopback 127/8 或 ::1）","type":"invalid_request_error","code":"channel_create_failed","request_id":"3cb35709a77f425acd1eb8aa"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/11_ssrf_1.body
+  [CHECK 12] ssrf_2
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"base_uri 校验失败: 拒绝内网/回环/元数据地址 169.254.169.254（link-local 169.254/16 含 169.254.169.254 与 fe80::/10）","type":"invalid_request_error","code":"channel_create_failed","request_id":"b9ddc667378dada6fe32a3e3"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/12_ssrf_2.body
+  [CHECK 13] ssrf_3
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"base_uri 校验失败: 拒绝协议 \"file\"：仅允许 http/https（file/gopher/ftp 等一律拒绝）","type":"invalid_request_error","code":"channel_create_failed","request_id":"43332cf4df1bb7c29c87d8dd"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/13_ssrf_3.body
+  [CHECK 14] ssrf_4
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"base_uri 校验失败: 拒绝内网/回环/元数据地址 10.0.0.1（RFC1918 10/8,172.16/12,192.168/16 或 ULA fc00::/7）","type":"invalid_request_error","code":"channel_create_failed","request_id":"850c4b7e6dc9a8f0676cdcc6"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.bnO2rW/14_ssrf_4.body
+  SSRF_BASE_URIS_TESTED : 4 (127.0.0.1 / 169.254.169.254 / file:// / 10.0.0.1)
+  判定口径：400 且响应体含「拒绝内网/回环/元数据」「base_uri 校验失败」等 SSRF 拒绝消息才计 PASS；
+            仅 400 但为「provider_type 必填」等字段错误则计 CHECK（未触及 SSRF 校验器）。
+
+====================================================================
+ [S9] 真实执行汇总（数值均来自上方 curl 与 python3 解析）
+====================================================================
+ BUILD_OK            : True
+ SERVER_UP           : True
+ SERVER_PID          : 38698
+ JWT_ACQUIRED        : True
+ SK_ACQUIRED         : True
+ SK_RPM_ACQUIRED     : True
+ TOTAL_CURL_CHECKS   : 14
+ EVIDENCE_DIR        : /tmp/llm-hub-e2e-evidence.bnO2rW
+ STATUS_FILES        :
+   01_healthz.status = 200
+   02_metrics.status = 200
+   03_api_me_invalid_token.status = 401
+   04_auth_register.status = 200
+   05_auth_login.status = 200
+   06_tokens_create_main.status = 200
+   07_tokens_create_rpm.status = 200
+   08_v1_models.status = 200
+   09_v1_chat_completions.status = 502
+   10_v1_messages.status = 502
+   11_ssrf_1.status = 400
+   12_ssrf_2.status = 400
+   13_ssrf_3.status = 400
+   14_ssrf_4.status = 400
+====================================================================
+
+--------------------------------------------------------------------
+ [CLEANUP] 清理真实启动的进程与临时二进制
+  killed SERVER_PID=38698
+  removed BIN=/tmp/llm-hub-e2e-server-38674
+  evidence dir kept: /tmp/llm-hub-e2e-evidence.bnO2rW
+--------------------------------------------------------------------

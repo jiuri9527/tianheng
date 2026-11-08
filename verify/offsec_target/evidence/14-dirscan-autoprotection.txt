@@ -1,0 +1,14 @@
+=== 14-offsec 扫描触发自动保护（真实记录）===
+-- scan_ports（dsh-plugin-offsec 原生）：341 端口仅 18400 开放（靶场端口收敛）
+   18400/tcp open  121ms
+
+-- dir_scan 26 字典路径：全部 423/134B —— 扫描期间自动保护已触发（见 events.jsonl）
+   /.env 与 /.git/HEAD 命中 state_probe 规则 → auto_lockdown(session_epoch=2) → sealed=True
+   其后所有探测路径（/wp-login.php /phpmyadmin /config.php /debug …）一律 423 lockdown_reject
+
+-- 落盘事件链（/tmp/tianheng-target-range/state/firewall/events.jsonl 原文节选）
+{"time": 1794064834, "rule": "state_probe", "severity": "critical", "action": "auto_ban_ip", "path": "/.env", "detail": "/.env Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
+{"time": 1794064834, "rule": "state_probe", "severity": "critical", "action": "score", "path": "/.git/HEAD", "detail": "/.git/HEAD Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (K
+{"time": 1794064834, "rule": "auto_lockdown", "severity": "critical", "action": "seal_all_sensitive_data", "path": "/", "detail": "trigger=state_probe; session_epoch=2; all business endpoints sealed; 
+
+-- 封存期间纵深防护：GET /api/firewall/events → {"code":"firewall_sealed"}（GuardSensitive 拦截，连运维事件读也被封）

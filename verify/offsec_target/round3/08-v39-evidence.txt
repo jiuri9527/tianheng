@@ -1,0 +1,28 @@
+=== 现状确认：一次探测即全站 423 ===
+{
+    "blocked_ips": 1,
+    "events": 23,
+    "last_event_hash": "5c80ebaf993b72afc950205394b8973bfc5138abf4b8f4a903166430a011fb38",
+    "level": "lockdown",
+    "lockdown_until": 1794068774,
+    "sealed": true,
+    "session_epoch": 1,
+    "source": "runtime-observation",
+    "tracked_ips": 1
+}
+--- 触发事件链 ---
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/telemetry/snapshot"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/telemetry/snapshot"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/telemetry/snapshot"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/telemetry/snapshot"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/telemetry/snapshot"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/tokens"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/tokens//rotate"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/tokens//rotate"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/tokens/tok_nope/rotate"}
+{"time": 1794068174, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/usage/series"}
+{"time": 1794068175, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/usage/series"}
+{"time": 1794068175, "ip": "127.0.0.1", "rule": "lockdown_reject", "severity": "high", "action": "observe", "path": "/api/usage/by-model"}
+--- 正常请求也被拒 ---
+  /api/rankings → HTTP 423（正常公开端点，应为 200）
+  /healthz → HTTP 200

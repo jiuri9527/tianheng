@@ -1,0 +1,110 @@
+diff --git a/src/internal/middleware/middleware.go b/src/internal/middleware/middleware.go
+--- a/src/internal/middleware/middleware.go
++++ b/src/internal/middleware/middleware.go
+@@ -76,16 +76,39 @@
+ 	return ""
+ }
+ 
++// sanitizeRequestID 只保留 [A-Za-z0-9_-] 且限长，防止客户端通过 X-Request-Id
++// 注入换行伪造日志行、或碰撞他人日志索引（logsByReqID 按 request_id 索引）。
++func sanitizeRequestID(s string) string {
++	if len(s) > 64 {
++		s = s[:64]
++	}
++	out := make([]byte, 0, len(s))
++	for i := 0; i < len(s); i++ {
++		c := s[i]
++		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
++			(c >= '0' && c <= '9') || c == '-' || c == '_' {
++			out = append(out, c)
++		}
++	}
++	return string(out)
++}
++
++// clientIP 只在直连对端是可信反代（回环/内网）时才采信 X-Forwarded-For，
++// 公网直连客户端不得自造 XFF 伪造来源 IP 绕过 ip_allowlist。
+ func clientIP(r *http.Request) string {
+-	if x := r.Header.Get("X-Forwarded-For"); x != "" {
+-		return strings.TrimSpace(strings.Split(x, ",")[0])
+-	}
+-	if x := r.Header.Get("X-Real-IP"); x != "" {
+-		return x
+-	}
+ 	host, _, err := net.SplitHostPort(r.RemoteAddr)
+ 	if err != nil {
+-		return r.RemoteAddr
++		host = r.RemoteAddr
++	}
++	peer := net.ParseIP(host)
++	trusted := peer != nil && (peer.IsLoopback() || peer.IsPrivate())
++	if trusted {
++		if x := r.Header.Get("X-Forwarded-For"); x != "" {
++			return strings.TrimSpace(strings.Split(x, ",")[0])
++		}
++		if x := r.Header.Get("X-Real-IP"); x != "" {
++			return x
++		}
+ 	}
+ 	return host
+ }
+@@ -93,7 +116,7 @@
+ // RequestID 生成并注入 request_id，写入 X-Request-Id 响应头。
+ func RequestID(next http.Handler) http.Handler {
+ 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-		rid := r.Header.Get("X-Request-Id")
++		rid := sanitizeRequestID(r.Header.Get("X-Request-Id"))
+ 		if rid == "" {
+ 			rid, _ = crypto.RandomHex(12)
+ 		}
+@@ -109,17 +132,26 @@
+ 	return func(next http.Handler) http.Handler {
+ 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 			origin := r.Header.Get("Origin")
+-			allow := origins
++			allow := ""
+ 			if strings.TrimSpace(origins) == "*" {
+ 				allow = "*"
+-			} else if origin != "" && !strings.Contains(origins, origin) {
+-				allow = ""
++			} else if origin != "" {
++				// 精确匹配，禁止 strings.Contains 的子串误放行。
++				for _, o := range strings.Split(origins, ",") {
++					if strings.TrimSpace(o) == origin {
++						allow = origin
++						break
++					}
++				}
+ 			}
+ 			if allow != "" {
+ 				w.Header().Set("Access-Control-Allow-Origin", allow)
+ 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+ 				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-Id")
+-				w.Header().Set("Access-Control-Allow-Credentials", "true")
++				// 通配 origin 时不得携带凭据。
++				if allow != "*" {
++					w.Header().Set("Access-Control-Allow-Credentials", "true")
++				}
+ 			}
+ 			if r.Method == http.MethodOptions {
+ 				w.WriteHeader(http.StatusNoContent)
+@@ -212,7 +244,8 @@
+ func (l *Limiter) Allow(t *store.Token, promptTokens int) (bool, string) {
+ 	// 全局默认桶（注入）
+ 	if l.Default != nil {
+-		if ok, _ := l.Default.Allow("global", 1); !ok {
++		// 全局桶改为按令牌分桶，避免单个攻击者耗尽共享桶锁死全站。
++		if ok, _ := l.Default.Allow("global:"+t.ID, 1); !ok {
+ 			return false, "global_rate_limit"
+ 		}
+ 	}
+@@ -341,7 +374,8 @@
+ 				return
+ 			}
+ 			defer limiter.Release(t.ID)
+-			t.LastUsedAt = time.Now().Unix()
++			// LastUsedAt 由 metering.ApplyBilling 在 store 锁内更新，
++			// 此处不再对共享指针做无锁写入。
+ 
+ 			ctx := context.WithValue(r.Context(), KeyToken, t)
+ 			ctx = context.WithValue(ctx, KeyUser, user)

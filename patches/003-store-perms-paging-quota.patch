@@ -1,0 +1,175 @@
+diff --git a/src/internal/store/store.go b/src/internal/store/store.go
+--- a/src/internal/store/store.go
++++ b/src/internal/store/store.go
+@@ -8,6 +8,7 @@
+ 	"encoding/hex"
+ 	"encoding/json"
+ 	"fmt"
++	"math"
+ 	"os"
+ 	"path/filepath"
+ 	"sort"
+@@ -212,6 +213,7 @@
+ 	logsByReqID  map[string]*RequestLog
+ 	usageByKey   map[string]*UsageDaily
+ 	settingByKey map[string]*Setting
++	ledgerRefs   map[string]bool // reason|refID -> 已记账（贡献奖励幂等）
+ }
+ 
+ func newDatabase() Database {
+@@ -240,7 +242,7 @@
+ func New(dir string) (*Store, error) {
+ 	s := &Store{dir: dir, db: newDatabase()}
+ 	if dir != "" {
+-		if err := os.MkdirAll(dir, 0o755); err != nil {
++		if err := os.MkdirAll(dir, 0o700); err != nil {
+ 			return nil, err
+ 		}
+ 		if err := s.load(); err != nil {
+@@ -317,7 +319,8 @@
+ 		}
+ 		tmp := filepath.Join(s.dir, "."+name+".tmp")
+ 		final := filepath.Join(s.dir, name+".json")
+-		if err := os.WriteFile(tmp, data, 0o644); err != nil {
++		// 数据文件含渠道密钥密文与完整请求日志，必须仅属主可读。
++		if err := os.WriteFile(tmp, data, 0o600); err != nil {
+ 			return err
+ 		}
+ 		if err := os.Rename(tmp, final); err != nil {
+@@ -366,6 +369,12 @@
+ 	for _, st := range s.db.Settings {
+ 		s.settingByKey[st.Key] = st
+ 	}
++	s.ledgerRefs = map[string]bool{}
++	for _, l := range s.db.QuotaLedger {
++		if l.RefID != "" {
++			s.ledgerRefs[l.Reason+"|"+l.RefID] = true
++		}
++	}
+ }
+ 
+ func (s *Store) ensureDefaults() {
+@@ -711,6 +720,18 @@
+ func (s *Store) AdjustQuota(userID string, delta float64, reason, refID string) {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
++	// 拒绝非有限/异常量级金额：NaN/Inf 会污染余额并使所有额度比较永久失效。
++	if math.IsNaN(delta) || math.IsInf(delta, 0) || math.Abs(delta) > 1e12 {
++		return
++	}
++	// 贡献奖励按 (reason, ref_id) 幂等，防止重试/并发重复返还造成双花。
++	if reason == "contribution_reward" && refID != "" {
++		k := reason + "|" + refID
++		if s.ledgerRefs[k] {
++			return
++		}
++		s.ledgerRefs[k] = true
++	}
+ 	if u, ok := s.usersByID[userID]; ok {
+ 		u.BalanceUSD += delta
+ 		u.UpdatedAt = time.Now().Unix()
+@@ -720,6 +741,80 @@
+ 		Reason: reason, RefID: refID, CreatedAt: time.Now().Unix(),
+ 	}
+ 	s.db.QuotaLedger = append(s.db.QuotaLedger, entry)
++}
++
++// ApplyBilling 在 store 锁内原子执行令牌已用额度、用户余额、贡献奖励返还，
++// 替代 metering 对共享指针的无锁写入，消除并发丢更新/双花。
++func (s *Store) ApplyBilling(tokenID, userID, contributorID string, cost, reward float64, refID string) bool {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if math.IsNaN(cost) || math.IsInf(cost, 0) || cost <= 0 || math.IsNaN(reward) || math.IsInf(reward, 0) {
++		return false
++	}
++	t := s.tokensByID[tokenID]
++	u := s.usersByID[userID]
++	if t != nil && t.QuotaUSD > 0 && t.UsedUSD+cost > t.QuotaUSD {
++		return false
++	}
++	if u != nil && u.BalanceUSD < cost {
++		return false
++	}
++	now := time.Now().Unix()
++	if t != nil {
++		t.UsedUSD += cost
++		t.LastUsedAt = now
++	}
++	if u != nil {
++		u.BalanceUSD -= cost
++		u.UpdatedAt = now
++		s.db.QuotaLedger = append(s.db.QuotaLedger, &QuotaLedger{
++			ID: NewID("ldg"), UserID: userID, DeltaUSD: -cost,
++			Reason: "consumption", RefID: refID, CreatedAt: now,
++		})
++	}
++	if reward > 0 && contributorID != "" && contributorID != userID {
++		k := "contribution_reward|" + refID
++		if refID != "" && s.ledgerRefs[k] {
++			return true
++		}
++		if refID != "" {
++			s.ledgerRefs[k] = true
++		}
++		if cu, ok := s.usersByID[contributorID]; ok {
++			cu.BalanceUSD += reward
++			cu.UpdatedAt = now
++		}
++		s.db.QuotaLedger = append(s.db.QuotaLedger, &QuotaLedger{
++			ID: NewID("ldg"), UserID: contributorID, DeltaUSD: reward,
++			Reason: "contribution_reward", RefID: refID, CreatedAt: now,
++		})
++	}
++	return true
++}
++
++// UpdateChannelLocked 在 store 锁内修改渠道，消除对内部指针的无锁写入竞态。
++func (s *Store) UpdateChannelLocked(id string, mutate func(*Channel)) error {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	c, ok := s.channelsByID[id]
++	if !ok {
++		return fmt.Errorf("渠道不存在")
++	}
++	mutate(c)
++	return nil
++}
++
++// SetPasswordHash 在锁内更新口令哈希，避免对内部指针的无锁写入造成数据竞争。
++func (s *Store) SetPasswordHash(userID, hash string) bool {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	u, ok := s.usersByID[userID]
++	if !ok {
++		return false
++	}
++	u.PasswordHash = hash
++	u.UpdatedAt = time.Now().Unix()
++	return true
+ }
+ 
+ func (s *Store) ListLedgerByUser(userID string) []*QuotaLedger {
+@@ -787,6 +882,11 @@
+ 	if f.Page <= 0 {
+ 		f.Page = 1
+ 	}
++	// 钳制 page 上限，避免 (f.Page-1)*f.PageSize 整数溢出为负导致切片 panic；
++	// PageSize 不设小上限，以保留管理面仪表盘一次性聚合全部日志的能力。
++	if f.Page > 1000000 {
++		f.Page = 1000000
++	}
+ 	start := (f.Page - 1) * f.PageSize
+ 	if start > total {
+ 		start = total
+@@ -833,6 +933,11 @@
+ func usageKey(day, userID, alias string) string { return day + "|" + userID + "|" + alias }
+ 
+ func (s *Store) AddUsage(day, userID, alias string, requests, promptTokens, completionTokens int, costUSD float64) {
++	// 上游 usage 不可信：非法聚合值不得入库（NaN 会让后续 json.Marshal 永久失败）。
++	if math.IsNaN(costUSD) || math.IsInf(costUSD, 0) || costUSD < 0 || requests < 0 ||
++		promptTokens < 0 || completionTokens < 0 {
++		return
++	}
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+ 	k := usageKey(day, userID, alias)

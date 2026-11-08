@@ -1,0 +1,20 @@
+=== V-39/V-40 复测：攻击后全站可用 ===
+  after-attack level=observe sealed=False blocked_ips=0 events=7
+  GET    /api/telemetry/snapshot?window=60&bucket=10    → 200
+  GET    /api/telemetry/snapshot?window=999             → 400
+  GET    /api/telemetry/models                          → 200
+  GET    /api/usage/series?window=300&bucket=60         → 200
+  GET    /api/usage/by-model                            → 200
+  POST   /api/tokens/tok_b7c1318bcc73397400a06c86/rotate → 200
+  POST   /api/tokens/tok_nope/rotate                    → 404
+  GET    /api/rankings?verify=1                         → 200
+  GET    /api/forum/posts                               → 200
+  GET    /v1/models/liquid/lfm-3-1.7b                   → 401
+  GET    /v1/models/nope/nope                           → 401
+  GET    /healthz                                       → 200
+  匿名 usage/series → 401
+  GET /v1/models/liquid/lfm-3-1.7b（sk-）→ 401
+  sk- liquid/lfm-3-1.7b                    → 200
+  sk- x-ai/grok-4.7                        → 200
+  sk- nope/nope                            → 404
+  sk- ../../../etc/passwd                  → 404

@@ -1,0 +1,10 @@
+=== 全端点复测（应 200/400/401/404，不再 423）===
+  GET    /api/telemetry/snapshot?window=60&bucket=10    → 429
+  GET    /api/telemetry/models                          → 429
+  GET    /api/usage/series                              → 429
+  GET    /api/usage/by-model                            → 429
+  POST   /api/tokens//rotate                            → 429
+  POST   /api/tokens/tok_nope/rotate                    → 429
+  GET    /api/rankings?verify=1                         → 429
+  GET    /v1/models/liquid/lfm-3-1.7b                   → 429
+  GET    /v1/models/nope/nope                           → 429

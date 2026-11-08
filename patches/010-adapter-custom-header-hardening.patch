@@ -1,0 +1,29 @@
+diff --git a/src/internal/adapter/adapter.go b/src/internal/adapter/adapter.go
+--- a/src/internal/adapter/adapter.go
++++ b/src/internal/adapter/adapter.go
+@@ -181,10 +181,25 @@
+ 	} else {
+ 		h.Set("Authorization", "Bearer "+cx.PlainKey)
+ 	}
++	// 自定义 header 不得覆盖鉴权/传输关键头，且不得含 CR/LF/NUL（防头注入与日志注入）。
+ 	for k, v := range cx.CustomHeaders {
++		lk := strings.ToLower(strings.TrimSpace(k))
++		if lk == "" || forbiddenHeader(lk) || strings.ContainsAny(k+v, "\r\n\x00") {
++			continue
++		}
+ 		h.Set(k, v)
+ 	}
+ 	return h
++}
++
++// forbiddenHeader 列出不允许由渠道贡献者覆盖的 hop-by-hop 与鉴权头。
++func forbiddenHeader(k string) bool {
++	switch k {
++	case "authorization", "x-api-key", "anthropic-version", "host", "content-length",
++		"transfer-encoding", "connection", "proxy-authorization", "cookie", "accept":
++		return true
++	}
++	return false
+ }
+ 
+ // asRawMap 把 JSON 对象解析为 map；非对象返回错误。

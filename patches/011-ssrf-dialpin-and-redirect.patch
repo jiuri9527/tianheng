@@ -1,0 +1,142 @@
+diff --git a/src/internal/ssrf/ssrf.go b/src/internal/ssrf/ssrf.go
+--- a/src/internal/ssrf/ssrf.go
++++ b/src/internal/ssrf/ssrf.go
+@@ -3,10 +3,13 @@
+ package ssrf
+ 
+ import (
++	"context"
+ 	"fmt"
+ 	"net"
++	"net/http"
+ 	"net/url"
+ 	"strings"
++	"time"
+ )
+ 
+ // Resolver 是可注入的 DNS 解析函数，便于离线单元测试。
+@@ -56,6 +59,12 @@
+ 			return fmt.Errorf("拒绝内网/回环/元数据地址 %s（%s）", ip.String(), reason)
+ 		}
+ 		return nil
++	}
++
++	// 拒绝非规范数字主机名（十进制/八进制/十六进制 IPv4 字面量，部分解析器
++	// 会将其解析为回环/内网地址，形成黑名单绕过）。
++	if looksNumericHost(h) {
++		return fmt.Errorf("拒绝非规范数字主机名 %q", host)
+ 	}
+ 
+ 	// 主机名：解析后对每一个 A/AAAA 结果做二次校验，任一命中即拒绝。
+@@ -115,3 +124,69 @@
+ 	}
+ 	return false, ""
+ }
++
++// looksNumericHost 判定一个仅由数字/点/十六进制字符组成的主机名（非合法点分 IP），
++// 这类名字在部分 libc 解析器里会被当作数值 IPv4 解释。
++func looksNumericHost(h string) bool {
++	if net.ParseIP(h) != nil {
++		return false
++	}
++	if h == "" {
++		return false
++	}
++	for _, r := range h {
++		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') ||
++			r == '.' || r == 'x' || r == 'X' {
++			continue
++		}
++		return false
++	}
++	return true
++}
++
++// SafeClient 构造出站 HTTP 客户端：拨号时解析并二次校验每个 IP（防 DNS rebinding），
++// 禁止跟随到内网/元数据地址的重定向，且限制重定向次数。
++func SafeClient(timeout time.Duration, lookup Resolver) *http.Client {
++	if lookup == nil {
++		lookup = defaultResolver
++	}
++	tr := &http.Transport{
++		Proxy: nil,
++		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
++			host, port, err := net.SplitHostPort(addr)
++			if err != nil {
++				return nil, err
++			}
++			ips, err := lookup(host)
++			if err != nil || len(ips) == 0 {
++				return nil, fmt.Errorf("ssrf: 拨号前解析 %q 失败", host)
++			}
++			for _, ip := range ips {
++				if blocked, reason := isBlocked(ip); blocked {
++					return nil, fmt.Errorf("ssrf: 拨号目标 %s 被拒绝（%s）", ip.String(), reason)
++				}
++			}
++			// 固定到已校验 IP 拨号，消除校验与连接之间的 TOCTOU。
++			d := net.Dialer{Timeout: 10 * time.Second}
++			var lastErr error
++			for _, ip := range ips {
++				c, err := d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
++				if err == nil {
++					return c, nil
++				}
++				lastErr = err
++			}
++			return nil, lastErr
++		},
++	}
++	return &http.Client{
++		Transport: tr,
++		Timeout:   timeout,
++		CheckRedirect: func(req *http.Request, via []*http.Request) error {
++			if len(via) >= 3 {
++				return fmt.Errorf("ssrf: 重定向次数过多")
++			}
++			return ValidateWithResolver(req.URL.String(), lookup)
++		},
++	}
++}
+diff --git a/src/internal/discovery/discovery.go b/src/internal/discovery/discovery.go
+--- a/src/internal/discovery/discovery.go
++++ b/src/internal/discovery/discovery.go
+@@ -16,6 +16,7 @@
+ 	"llm-hub/src/internal/adapter"
+ 	"llm-hub/src/internal/config"
+ 	"llm-hub/src/internal/crypto"
++	"llm-hub/src/internal/ssrf"
+ 	"llm-hub/src/internal/store"
+ )
+ 
+@@ -36,7 +37,8 @@
+ func New(st *store.Store, cipher *crypto.Cipher, cfg *config.Config) *Discoverer {
+ 	return &Discoverer{
+ 		St: st, Cipher: cipher, Cfg: cfg,
+-		Doer: &http.Client{Timeout: 15 * time.Second},
++		// 出站必须走 SSRF 安全客户端：拨号前 IP 校验 + 禁止内网重定向。
++		Doer: ssrf.SafeClient(15*time.Second, nil),
+ 	}
+ }
+ 
+diff --git a/src/internal/relay/relay.go b/src/internal/relay/relay.go
+--- a/src/internal/relay/relay.go
++++ b/src/internal/relay/relay.go
+@@ -17,6 +17,7 @@
+ 	"llm-hub/src/internal/adapter"
+ 	"llm-hub/src/internal/config"
+ 	"llm-hub/src/internal/crypto"
++	"llm-hub/src/internal/ssrf"
+ 	"llm-hub/src/internal/store"
+ )
+ 
+@@ -60,7 +61,8 @@
+ func New(st *store.Store, cipher *crypto.Cipher, cfg *config.Config) *Relay {
+ 	return &Relay{
+ 		St: st, Cipher: cipher, Cfg: cfg,
+-		Doer: &http.Client{Timeout: 180 * time.Second},
++		// 反代理出站同样必须防 DNS rebinding 与内网重定向。
++		Doer: ssrf.SafeClient(180*time.Second, nil),
+ 	}
+ }
+ 

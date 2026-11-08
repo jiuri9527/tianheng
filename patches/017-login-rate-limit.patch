@@ -1,0 +1,84 @@
+diff --git a/src/internal/api/auth_api.go b/src/internal/api/auth_api.go
+--- a/src/internal/api/auth_api.go
++++ b/src/internal/api/auth_api.go
+@@ -3,6 +3,9 @@
+ import (
+ 	"fmt"
+ 	"net/http"
++	"strings"
++	"sync"
++	"time"
+ 
+ 	"llm-hub/src/internal/middleware"
+ 	"llm-hub/src/internal/store"
+@@ -27,12 +30,62 @@
+ 	})
+ }
+ 
++// 登录失败限流（F13）：每 (client_ip, email) 窗口内最多 5 次失败尝试。
++var loginFails = struct {
++	sync.Mutex
++	m map[string]*loginFailRecord
++}{m: map[string]*loginFailRecord{}}
++
++type loginFailRecord struct {
++	count int
++	until int64
++}
++
++const (
++	loginFailWindowSec = 60
++	loginFailMax       = 5
++	loginFailMaxKeys   = 100000
++)
++
++func loginRateLimited(key string) bool {
++	loginFails.Lock()
++	defer loginFails.Unlock()
++	now := time.Now().Unix()
++	r := loginFails.m[key]
++	if r == nil || now >= r.until {
++		if len(loginFails.m) >= loginFailMaxKeys {
++			for k, v := range loginFails.m {
++				if now >= v.until {
++					delete(loginFails.m, k)
++				}
++			}
++		}
++		if len(loginFails.m) < loginFailMaxKeys {
++			loginFails.m[key] = &loginFailRecord{count: 1, until: now + loginFailWindowSec}
++		}
++		return false
++	}
++	r.count++
++	return r.count > loginFailMax
++}
++
++func resetLoginFails(key string) {
++	loginFails.Lock()
++	delete(loginFails.m, key)
++	loginFails.Unlock()
++}
++
+ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+ 	var in struct {
+ 		Email    string `json:"email"`
+ 		Password string `json:"password"`
+ 	}
+ 	if !decodeJSON(w, r, &in) {
++		return
++	}
++	key := middleware.ClientIPFrom(r.Context()) + "|" + strings.ToLower(strings.TrimSpace(in.Email))
++	if loginRateLimited(key) {
++		fail(w, r, http.StatusTooManyRequests, "rate_limit_error", "login_rate_limited", "too many failed login attempts")
+ 		return
+ 	}
+ 	u, tok, err := s.Auth.Login(in.Email, in.Password)
+@@ -40,6 +93,7 @@
+ 		fail(w, r, http.StatusUnauthorized, "invalid_request_error", "login_failed", err.Error())
+ 		return
+ 	}
++	resetLoginFails(key)
+ 	writeJSON(w, http.StatusOK, map[string]interface{}{"user": userView(u), "tokens": tok})
+ }
+ 

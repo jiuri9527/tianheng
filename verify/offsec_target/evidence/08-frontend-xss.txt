@@ -1,0 +1,5 @@
+--- 前端 dangerouslySetInnerHTML 全仓检查 ---
+web/app/layout.tsx:39:        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+web/components/ForumClient.tsx:10: *    dangerouslySetInnerHTML；后端已对输入做 sanitizeText + JSON HTML 转义。
+web/components/ForumPostDetail.tsx:118:        {/* 所有用户内容均为纯文本渲染，绝不 dangerouslySetInnerHTML */}
+web/components/ForumAuth.tsx:91:          {/* 用户内容一律纯文本渲染，绝不 dangerouslySetInnerHTML */}

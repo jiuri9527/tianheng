@@ -1,0 +1,37 @@
+diff --git a/src/internal/rt/scheduler.go b/src/internal/rt/scheduler.go
+--- a/src/internal/rt/scheduler.go
++++ b/src/internal/rt/scheduler.go
+@@ -6,6 +6,7 @@
+ import (
+ 	"container/heap"
+ 	"context"
++	"fmt"
+ 	"sync"
+ 	"sync/atomic"
+ 	"time"
+@@ -136,7 +137,7 @@
+ 		s.mu.Unlock()
+ 
+ 		atomic.AddInt64(&s.inFlight, 1)
+-		err := it.task.Fn(s.ctx)
++		err := runTask(it.task.Fn, s.ctx)
+ 		atomic.AddInt64(&s.inFlight, -1)
+ 		if err != nil {
+ 			atomic.AddUint64(&s.failed, 1)
+@@ -144,6 +145,16 @@
+ 			atomic.AddUint64(&s.completed, 1)
+ 		}
+ 	}
++}
++
++// runTask 隔离任务 panic：单个任务处理不可信上游数据时崩溃不得终止整个进程。
++func runTask(fn func(context.Context) error, ctx context.Context) (err error) {
++	defer func() {
++		if r := recover(); r != nil {
++			err = fmt.Errorf("rt: task panic: %v", r)
++		}
++	}()
++	return fn(ctx)
+ }
+ 
+ // Stop 优雅停止：取消上下文、唤醒并等待 worker 退出。

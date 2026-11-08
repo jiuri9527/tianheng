@@ -1,0 +1,43 @@
+$ go build ./...
+EXIT=0
+
+$ go test ./... -count=1
+ok  	llm-hub/kernel	0.503s
+?   	llm-hub/src/cmd/server	[no test files]
+?   	llm-hub/src/hub	[no test files]
+?   	llm-hub/src/internal/adapter	[no test files]
+?   	llm-hub/src/internal/api	[no test files]
+?   	llm-hub/src/internal/auth	[no test files]
+?   	llm-hub/src/internal/channel	[no test files]
+?   	llm-hub/src/internal/config	[no test files]
+?   	llm-hub/src/internal/crypto	[no test files]
+?   	llm-hub/src/internal/discovery	[no test files]
+?   	llm-hub/src/internal/health	[no test files]
+?   	llm-hub/src/internal/metering	[no test files]
+?   	llm-hub/src/internal/middleware	[no test files]
+?   	llm-hub/src/internal/models	[no test files]
+?   	llm-hub/src/internal/relay	[no test files]
+?   	llm-hub/src/internal/router	[no test files]
+?   	llm-hub/src/internal/rt	[no test files]
+?   	llm-hub/src/internal/ssrf	[no test files]
+?   	llm-hub/src/internal/store	[no test files]
+ok  	llm-hub/tests	0.449s
+EXIT=0
+
+$ go vet ./...
+EXIT=0
+
+$ go test -bench . -benchmem ./kernel/...
+goos: darwin
+goarch: arm64
+pkg: llm-hub/kernel
+cpu: Apple M2
+BenchmarkQueue-8        	52253431	        24.39 ns/op	       0 B/op	       0 allocs/op
+BenchmarkScheduler-8    	 2226494	       527.2 ns/op	     103 B/op	       3 allocs/op
+BenchmarkStreamPipe-8   	  252471	      4953 ns/op	 303.67 MB/s	    6144 B/op	      72 allocs/op
+PASS
+ok  	llm-hub/kernel	5.805s
+EXIT=0
+
+$ go test ./tests/... -count=1 -v | grep -c -- "--- PASS"
+41

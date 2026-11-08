@@ -1,0 +1,53 @@
+diff --git a/src/internal/rt/limiter.go b/src/internal/rt/limiter.go
+--- a/src/internal/rt/limiter.go
++++ b/src/internal/rt/limiter.go
+@@ -1,6 +1,7 @@
+ package rt
+ 
+ import (
++	"math"
+ 	"sync"
+ 	"time"
+ 
+@@ -23,16 +24,21 @@
+ 
+ // NewTokenBucketLimiter 构造限流器。rate=每秒补充速率，capacity=桶容量。
+ func NewTokenBucketLimiter(rate, capacity float64) *TokenBucketLimiter {
+-	if rate <= 0 {
++	// 非有限值会让 b.tokens 变成 NaN/Inf：NaN 令比较永久失败（全量拒绝），
++	// Inf 令限流被绕过。此处强制回退到有限默认值。
++	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate <= 0 {
+ 		rate = 1
+ 	}
+-	if capacity <= 0 {
++	if math.IsNaN(capacity) || math.IsInf(capacity, 0) || capacity <= 0 {
+ 		capacity = rate
+ 	}
+ 	return &TokenBucketLimiter{
+ 		buckets: map[string]*bucket{}, rate: rate, capacity: capacity, clock: time.Now,
+ 	}
+ }
++
++// maxBuckets 限制桶表基数：key 若来自攻击者可控标识，无界 map 会导致内存耗尽。
++const maxBuckets = 100000
+ 
+ // Allow 判断 key 是否还能消费 cost 个 token。
+ func (l *TokenBucketLimiter) Allow(key string, cost int64) (bool, error) {
+@@ -44,6 +50,17 @@
+ 	now := l.clock()
+ 	b, ok := l.buckets[key]
+ 	if !ok {
++		if len(l.buckets) >= maxBuckets {
++			// 先清理已满（空闲）的桶；仍满则拒绝新 key，fail closed 不无限增长。
++			for k, v := range l.buckets {
++				if v.tokens >= l.capacity {
++					delete(l.buckets, k)
++				}
++			}
++			if len(l.buckets) >= maxBuckets {
++				return false, nil
++			}
++		}
+ 		b = &bucket{tokens: l.capacity, last: now}
+ 		l.buckets[key] = b
+ 	}

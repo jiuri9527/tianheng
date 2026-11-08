@@ -1,0 +1,8 @@
+--- telemetry SSE 并发上限检查 ---
+434:	flusher, ok := w.(http.Flusher)
+437:			"ResponseWriter does not implement http.Flusher")
+452:	ticker := time.NewTicker(streamInterval)
+454:	for {
+456:		case <-r.Context().Done():
+460:			case <-r.Context().Done():
+471:func (h *handler) writeFrame(w http.ResponseWriter, f http.Flusher) error {

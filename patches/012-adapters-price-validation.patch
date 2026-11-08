@@ -1,0 +1,27 @@
+diff --git a/src/internal/adapter/adapters.go b/src/internal/adapter/adapters.go
+--- a/src/internal/adapter/adapters.go
++++ b/src/internal/adapter/adapters.go
+@@ -4,6 +4,7 @@
+ 	"encoding/json"
+ 	"fmt"
+ 	"io"
++	"math"
+ 	"net/http"
+ 	"strconv"
+ 	"strings"
+@@ -55,8 +56,13 @@
+ 		var ps, cs string
+ 		_ = json.Unmarshal(pr["prompt"], &ps)
+ 		_ = json.Unmarshal(pr["completion"], &cs)
+-		dm.PromptPrice, _ = strconv.ParseFloat(ps, 64)
+-		dm.CompletionPrice, _ = strconv.ParseFloat(cs, 64)
++		// 上游定价不可信：NaN/Inf/负数/异常量级会污染计费并使落盘 JSON 编码失败。
++		if p, err := strconv.ParseFloat(ps, 64); err == nil && !math.IsNaN(p) && !math.IsInf(p, 0) && p >= 0 && p < 1 {
++			dm.PromptPrice = p
++		}
++		if p, err := strconv.ParseFloat(cs, 64); err == nil && !math.IsNaN(p) && !math.IsInf(p, 0) && p >= 0 && p < 1 {
++			dm.CompletionPrice = p
++		}
+ 	}
+ 	if v, ok := m["supported_parameters"]; ok {
+ 		var params []string

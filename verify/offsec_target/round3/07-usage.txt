@@ -1,0 +1,5 @@
+=== [G] usage 端点鉴权与泄露 ===
+  匿名 /api/usage/series → HTTP 423（应 401）
+  JWT /api/usage/series → HTTP 423（应 200）
+  usage keys: ['error']
+  PLAINTEXT_LEAK: NONE

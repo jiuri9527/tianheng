@@ -1,0 +1,355 @@
+================================================================================
+ verify/check_real_data.py · 真实模型数据合规校验（零第三方依赖 / 真实文件读取）
+================================================================================
+ 运行时间       : 2026-11-07 21:55:52
+ 项目根目录     : /Users/jiuri/Desktop/Tianheng
+ Python         : 3.9.6
+ 候选规则       : R1 形态 + R2 真实供应商前缀/模型族 + R3 模型语境 + R4 路径/扩展名/Go/CSS 排除
+                 + R5 基线/参考 information-only + R6 负例/校验夹具 information-only
+
+--------------------------------------------------------------------------------
+ [1] 基准真值 data/models-real.json
+--------------------------------------------------------------------------------
+ 文件字节数      : 827419
+ SHA-256        : 08b4635fd684689feda841f906d59e0dcd8ad9dd57a7c0b7f0667d46b740876a
+ 模型总数        : 460
+ 唯一 id 数      : 460
+ 供应商数        : 69
+ 供应商(69)      : aion-labs, amazon, anthracite-org, anthropic, bytedance, bytedance-seed, cognitivecomputations, cohere, deepseek, dots-studio, elorian, fireworks, google, gryphe, ibm-granite, inception, inclusionai, inference-net, liquid, mancer, meituan, meta, meta-llama, microsoft, minimax, mistralai, moondream, moonshotai, morph, nex-agi, nousresearch, nvidia, openai, openrouter, particle-ai, perceptron, perplexity, prism-ml, qwen, recursive, reflection, rekaai, relace, ricursiveai, sakana, sao10k, scaledown, stealth, stepfun, tencent, thedrummer, thinkingmachines, typesafe, unbiased, undi95, upstage, writer, x-ai, xiaomi, xingchen-agi, z-ai, ~anthropic, ~deepseek, ~google, ~moonshotai, ~openai, ~unbiased, ~x-ai, ~z-ai
+ 上游元数据 slug(canonical_slug/hugging_face_id/id) 去重数: 849
+ 与 SPEC.md C-1 声明比对:
+   SHA-256 一致  : True (SPEC=08b4635fd684689feda841f906d59e0dcd8ad9dd57a7c0b7f0667d46b740876a)
+   460 模型一致  : True
+   69 供应商一致 : True
+
+--------------------------------------------------------------------------------
+ [2] 扫描范围与文件分类
+--------------------------------------------------------------------------------
+ 纳入文本文件    : 153
+   DELIVERABLE     : 147
+   BASELINE        : 4
+   GROUND_TRUTH_REF: 2
+ 识别为'模型数据集 JSON'(结构化校验 id，不做整行正则): 2
+   - src/internal/models/models-real.json (460 条)
+   - web/data/models.json (460 条)
+ 跳过(规则)      : data/models-real.json, data/models-real-summary.json,
+                   verify/**, .git/**, node_modules/**, vendor/**, 二进制/超大文件
+ 纳入文件清单:
+   [BASE]           LLM-API-Aggregator-Prompt.md (25053 B)
+   [DELI]           Makefile (647 B)
+   [BASE]           README.md (4897 B)
+   [BASE]           SPEC.md (7691 B)
+   [GROU]           data/models-real-summary.md (4067 B)
+   [GROU]           data/openrouter-home.html (214265 B)
+   [DELI]           deploy/.env.example (1807 B)
+   [DELI]           deploy/Dockerfile (839 B)
+   [DELI]           deploy/docker-compose.yml (2030 B)
+   [DELI]           deploy/nginx.conf (1907 B)
+   [DELI]           docs/01-方案初稿.md (76724 B)
+   [DELI]           docs/02-方案完善版.md (103217 B)
+   [DELI]           docs/03-方案审核报告.md (48340 B)
+   [DELI]           docs/04-UI设计规范.md (33914 B)
+   [DELI]           docs/05-内核设计.md (25883 B)
+   [DELI]           docs/06-代码审核与测试.md (28000 B)
+   [DELI]           docs/07-漏洞审查与修复.md (60666 B)
+   [BASE]           go.mod (24 B)
+   [DELI]           kernel/bench_test.go (1086 B)
+   [DELI]           kernel/contract.go (1697 B)
+   [DELI]           kernel/limiter.go (2557 B)
+   [DELI]           kernel/limiter_test.go (1952 B)
+   [DELI]           kernel/metrics.go (3403 B)
+   [DELI]           kernel/pool.go (2995 B)
+   [DELI]           kernel/queue.go (4279 B)
+   [DELI]           kernel/queue_test.go (2109 B)
+   [DELI]           kernel/scheduler.go (4150 B)
+   [DELI]           kernel/scheduler_test.go (2974 B)
+   [DELI]           kernel/selector.go (3350 B)
+   [DELI]           kernel/selector_test.go (3035 B)
+   [DELI]           kernel/streampipe.go (2551 B)
+   [DELI]           kernel/streampipe_test.go (2879 B)
+   [DELI]           kernel/worker.go (3226 B)
+   [DELI]           patches/001-config-secrets-and-bounds.patch (3860 B)
+   [DELI]           patches/002-crypto-master-key-and-keyhint.patch (1449 B)
+   [DELI]           patches/003-store-perms-paging-quota.patch (5495 B)
+   [DELI]           patches/004-scheduler-panic-guard.patch (938 B)
+   [DELI]           patches/005-metrics-cardinality.patch (1789 B)
+   [DELI]           patches/006-limiter-finite-and-bounded.patch (1624 B)
+   [DELI]           patches/007-auth-hardening.patch (3604 B)
+   [DELI]           patches/008-convert-usage-bounds.patch (2070 B)
+   [DELI]           patches/009-stream-sse-injection-and-limits.patch (3281 B)
+   [DELI]           patches/010-adapter-custom-header-hardening.patch (993 B)
+   [DELI]           patches/011-ssrf-dialpin-and-redirect.patch (4286 B)
+   [DELI]           patches/012-adapters-price-validation.patch (953 B)
+   [DELI]           patches/013-metering-cost-mask-billing.patch (2786 B)
+   [DELI]           patches/014-middleware-ip-cors-log-injection.patch (3837 B)
+   [DELI]           patches/015-concurrent-channel-mutation-races.patch (4115 B)
+   [DELI]           patches/016-kernel-stream-and-limiter.patch (1634 B)
+   [DELI]           patches/017-login-rate-limit.patch (2086 B)
+   [DELI]           patches/018-models-api-deadlock-and-authz.patch (2200 B)
+   [DELI]           src/cmd/server/main.go (2178 B)
+   [DELI]           src/hub/hub.go (7276 B)
+   [DELI]           src/internal/adapter/adapter.go (6423 B)
+   [DELI]           src/internal/adapter/adapters.go (7589 B)
+   [DELI]           src/internal/adapter/convert.go (20377 B)
+   [DELI]           src/internal/adapter/stream.go (14995 B)
+   [DELI]           src/internal/api/admin_api.go (5596 B)
+   [DELI]           src/internal/api/auth_api.go (6515 B)
+   [DELI]           src/internal/api/channels_api.go (4154 B)
+   [DELI]           src/internal/api/dataplane.go (8000 B)
+   [DELI]           src/internal/api/metrics.go (1403 B)
+   [DELI]           src/internal/api/models_api.go (8095 B)
+   [DELI]           src/internal/api/server.go (10840 B)
+   [DELI]           src/internal/api/tokens_api.go (2534 B)
+   [DELI]           src/internal/auth/auth.go (7619 B)
+   [DELI]           src/internal/channel/channel.go (8602 B)
+   [DELI]           src/internal/config/config.go (4711 B)
+   [DELI]           src/internal/crypto/crypto.go (5696 B)
+   [DELI]           src/internal/discovery/discovery.go (9349 B)
+   [DELI]           src/internal/health/health.go (3133 B)
+   [DELI]           src/internal/metering/metering.go (6200 B)
+   [DELI]           src/internal/middleware/middleware.go (12321 B)
+   [DELI] [DATASET] src/internal/models/models-real.json (827419 B)
+   [DELI]           src/internal/models/models.go (5167 B)
+   [DELI]           src/internal/relay/relay.go (11801 B)
+   [DELI]           src/internal/router/router.go (4729 B)
+   [DELI]           src/internal/rt/limiter.go (2478 B)
+   [DELI]           src/internal/rt/scheduler.go (4840 B)
+   [DELI]           src/internal/rt/selector.go (4286 B)
+   [DELI]           src/internal/rt/streampipe.go (2978 B)
+   [DELI]           src/internal/ssrf/ssrf.go (5769 B)
+   [DELI]           src/internal/store/store.go (28986 B)
+   [DELI]           tests/adapter_test.go (15283 B)
+   [DELI]           tests/api_test.go (9275 B)
+   [DELI]           tests/crypto_test.go (3299 B)
+   [DELI]           tests/discovery_test.go (7099 B)
+   [DELI]           tests/helpers_test.go (5076 B)
+   [DELI]           tests/realdata_test.go (3980 B)
+   [DELI]           tests/relay_test.go (4562 B)
+   [DELI]           tests/ssrf_test.go (2834 B)
+   [DELI]           web/.gitignore (77 B)
+   [DELI]           web/app/admin/channels/page.tsx (1913 B)
+   [DELI]           web/app/admin/models/page.tsx (2434 B)
+   [DELI]           web/app/admin/page.tsx (3429 B)
+   [DELI]           web/app/admin/settings/page.tsx (806 B)
+   [DELI]           web/app/admin/users/page.tsx (803 B)
+   [DELI]           web/app/channels/[id]/page.tsx (2134 B)
+   [DELI]           web/app/channels/page.tsx (3396 B)
+   [DELI]           web/app/dashboard/page.tsx (6047 B)
+   [DELI]           web/app/globals.css (6317 B)
+   [DELI]           web/app/layout.tsx (2512 B)
+   [DELI]           web/app/login/page.tsx (217 B)
+   [DELI]           web/app/logs/page.tsx (1653 B)
+   [DELI]           web/app/models/[id]/page.tsx (9959 B)
+   [DELI]           web/app/models/page.tsx (4697 B)
+   [DELI]           web/app/page.tsx (11305 B)
+   [DELI]           web/app/register/page.tsx (223 B)
+   [DELI]           web/app/tokens/page.tsx (1004 B)
+   [DELI]           web/app/usage/page.tsx (3447 B)
+   [DELI]           web/components/AdminModelTable.tsx (3788 B)
+   [DELI]           web/components/AdminRuntime.tsx (10375 B)
+   [DELI]           web/components/AuthForm.tsx (4214 B)
+   [DELI]           web/components/ChannelDetailView.tsx (14995 B)
+   [DELI]           web/components/ChannelForm.tsx (11712 B)
+   [DELI]           web/components/Chart.tsx (8438 B)
+   [DELI]           web/components/CodeBlock.tsx (1969 B)
+   [DELI]           web/components/ConsoleLayout.tsx (1493 B)
+   [DELI]           web/components/DataPolicyVisual.tsx (5336 B)
+   [DELI]           web/components/EmptyState.tsx (1401 B)
+   [DELI]           web/components/FilterBar.tsx (5114 B)
+   [DELI]           web/components/LogsTable.tsx (7378 B)
+   [DELI]           web/components/ModelCard.tsx (3774 B)
+   [DELI]           web/components/Pagination.tsx (2251 B)
+   [DELI]           web/components/PriceTable.tsx (5546 B)
+   [DELI]           web/components/ProbeSampleCard.tsx (3959 B)
+   [DELI]           web/components/RoutingVisual.tsx (7822 B)
+   [DELI]           web/components/RuntimeMetrics.tsx (4389 B)
+   [DELI]           web/components/SectionHeading.tsx (1545 B)
+   [DELI]           web/components/Sidebar.tsx (3571 B)
+   [DELI]           web/components/SiteFooter.tsx (3449 B)
+   [DELI]           web/components/SiteHeader.tsx (4609 B)
+   [DELI]           web/components/StatCard.tsx (1305 B)
+   [DELI]           web/components/StatusBadge.tsx (2343 B)
+   [DELI]           web/components/ThemeToggle.tsx (3965 B)
+   [DELI]           web/components/TokenManager.tsx (11495 B)
+   [DELI]           web/components/UsageRuntime.tsx (4258 B)
+   [DELI] [DATASET] web/data/models.json (646789 B)
+   [DELI]           web/lib/api.ts (7380 B)
+   [DELI]           web/lib/constants.ts (624 B)
+   [DELI]           web/lib/models.ts (8567 B)
+   [DELI]           web/lib/stats.ts (6024 B)
+   [DELI]           web/lib/types.ts (6788 B)
+   [DELI]           web/next-env.d.ts (228 B)
+   [DELI]           web/next.config.js (779 B)
+   [DELI]           web/package-lock.json (55295 B)
+   [DELI]           web/package.json (891 B)
+   [DELI]           web/postcss.config.js (83 B)
+   [DELI]           web/scripts/check-syntax.mjs (3072 B)
+   [DELI]           web/scripts/export-models.mjs (2213 B)
+   [DELI]           web/scripts/verify-models.mjs (4550 B)
+   [DELI]           web/tailwind.config.ts (6409 B)
+   [DELI]           web/tsconfig.json (638 B)
+
+--------------------------------------------------------------------------------
+ [3] 派生数据一致性与交付数据集副本校验（逐条 id ∈ 真值集合 + 逐字段比对）
+--------------------------------------------------------------------------------
+ [GROUND_TRUTH_REF] data/models-real-summary.json : 460 条, 不在真值集合: 0 []
+ [GROUND_TRUTH_REF] data/models-real-summary.md   : 模型语境 id 30 条, 不在真值集合: 0 []
+     已排除的路径字面量(不计为 id): 1 个 ['data/models-real.json']
+ [DELIVERABLE] src/internal/models/models-real.json
+     记录数=460  不在真值集合的 id=0 []  真值缺失=0 []
+     SHA-256=08b4635fd684689feda841f906d59e0dcd8ad9dd57a7c0b7f0667d46b740876a  与真值逐字节一致=True
+     逐字段比对(name/canonical_slug/description/created/context_length/pricing.prompt/pricing.completion/architecture.modality/top_provider.context_length):
+       可比字段值次数=4131  与真值不一致=0 []
+ [DELIVERABLE] web/data/models.json
+     记录数=460  不在真值集合的 id=0 []  真值缺失=0 []
+     SHA-256=8a42127d477e21efcf098d53f0f533cd879370263623ddb5d0c27e641c17b061  与真值逐字节一致=False
+     逐字段比对(name/canonical_slug/description/created/context_length/pricing.prompt/pricing.completion/architecture.modality/top_provider.context_length):
+       可比字段值次数=4131  与真值不一致=0 []
+ 数据集副本中'不在真值集合的 id'合计: 0（应为 0）
+ 数据集副本中'字段值与真值不一致'合计: 0（应为 0）
+
+--------------------------------------------------------------------------------
+ [4] 候选抽取与比对（严格模型语境口径）
+--------------------------------------------------------------------------------
+ 正则扫描文本行数            : 25777
+ 模型语境候选种类(去重)       : 40
+   ├ 真实命中(∈真值集合)      : 36
+   ├ 上游元数据 slug(非模型 id, 合法): 4
+   ├ 可疑编造项(真正伪造, 交付物, 非夹具): 0
+   ├ 负例/校验夹具 token(information-only): 0
+   └ 基线/参考文件 token(information-only): 0
+ R4 排除的路径/扩展名/Go/CSS/非语境 token 次数: 2674
+ 裸短名/别名候选(去重)        : 10
+
+--------------------------------------------------------------------------------
+ [5] 真实命中（候选 id ∈ data/models-real.json）
+--------------------------------------------------------------------------------
+ REAL  deepseek/deepseek-v4.1-flash                   ×3   首处 docs/04-UI设计规范.md:274
+ REAL  deepseek/deepseek-v4.1-flash-1017              ×1   首处 data/models-real-summary.md:28
+ REAL  elorian/glimpse                                ×1   首处 data/models-real-summary.md:29
+ REAL  google/gemini-2.5-pro                          ×1   首处 docs/03-方案审核报告.md:59
+ REAL  google/gemini-3.8-flash                        ×10  首处 docs/02-方案完善版.md:288
+ REAL  google/gemini-4-argon                          ×5   首处 data/openrouter-home.html:127
+ REAL  google/gemini-omni-1.1-flash                   ×1   首处 data/models-real-summary.md:15
+ REAL  google/gemini-omni-1.2-flash                   ×15  首处 data/models-real-summary.md:14
+ REAL  inception/mercury-3                            ×1   首处 data/models-real-summary.md:32
+ REAL  liquid/lfm-3-1.7b                              ×38  首处 data/models-real-summary.md:12
+ REAL  liquid/lfm-3-1.7b:free                         ×1   首处 data/models-real-summary.md:13
+ REAL  meta-llama/llama-4-maverick                    ×2   首处 docs/04-UI设计规范.md:277
+ REAL  meta/muse-spark-open                           ×1   首处 data/models-real-summary.md:36
+ REAL  minimax/minimax-m3.1-flash                     ×3   首处 data/models-real-summary.md:27
+ REAL  mistralai/mistral-large-4-0                    ×2   首处 docs/04-UI设计规范.md:279
+ REAL  moondream/moondream3-preview                   ×1   首处 data/models-real-summary.md:34
+ REAL  moondream/moondream3.1-9b-a2b                  ×1   首处 data/models-real-summary.md:35
+ REAL  moonshotai/kimi-k3.1-pro                       ×3   首处 data/models-real-summary.md:25
+ REAL  nvidia/nemotron-3.5-super-vl                   ×3   首处 data/models-real-summary.md:37
+ REAL  nvidia/nemotron-3.5-super-vl:free              ×1   首处 data/models-real-summary.md:38
+ REAL  openrouter/auto                                ×3   首处 docs/04-UI设计规范.md:242
+ REAL  particle-ai/particle-1                         ×1   首处 data/models-real-summary.md:20
+ REAL  prism-ml/ternary-bonsai-2-9b                   ×1   首处 data/models-real-summary.md:33
+ REAL  qwen/qwen3.8-max-prime                         ×2   首处 docs/04-UI设计规范.md:284
+ REAL  recursive/flint-v1.0:free                      ×1   首处 data/models-real-summary.md:26
+ REAL  reflection/beam-1.0-501b-a23b                  ×1   首处 data/models-real-summary.md:31
+ REAL  ricursiveai/ripple-65b-preview                 ×1   首处 data/models-real-summary.md:16
+ REAL  stealth/crouton-alpha                          ×1   首处 data/models-real-summary.md:18
+ REAL  tencent/hy4                                    ×17  首处 data/models-real-summary.md:17
+ REAL  unbiased/pareto-26.10                          ×1   首处 data/models-real-summary.md:39
+ REAL  unbiased/pareto-26.9                           ×1   首处 data/models-real-summary.md:41
+ REAL  x-ai/grok-4.20                                 ×3   首处 docs/04-UI设计规范.md:286
+ REAL  x-ai/grok-4.7                                  ×16  首处 docs/01-方案初稿.md:81
+ REAL  xingchen-agi/xing4.0-29b-a4b:free              ×1   首处 data/models-real-summary.md:30
+ REAL  z-ai/glm-5.3-flashx-legal                      ×3   首处 data/models-real-summary.md:19
+ REAL  ~unbiased/pareto-latest                        ×1   首处 data/models-real-summary.md:40
+ 真实命中种类: 36
+
+--------------------------------------------------------------------------------
+ [5b] 上游元数据 slug（canonical_slug / hugging_face_id，非模型 id，不计入编造）
+--------------------------------------------------------------------------------
+ 共 4 种，示例（前 12 种）:
+   METADATA google/gemini-omni-1.2-flash-20261105            ×3 首处 docs/01-方案初稿.md:850
+   METADATA liquid/lfm-3-1.7b-20261106                       ×2 首处 docs/02-方案完善版.md:930
+   METADATA tencent/hy4-20261104                             ×3 首处 docs/01-方案初稿.md:851
+   METADATA x-ai/grok-4.7-20260916                           ×3 首处 docs/01-方案初稿.md:847
+
+--------------------------------------------------------------------------------
+ [6] 可疑编造项（DELIVERABLE 内、模型语境下、∉真值 id 集合、且非校验夹具的伪造模型名）
+--------------------------------------------------------------------------------
+ (无 —— 可疑编造项 = 0)
+ 可疑编造项合计: 0 种（交付物内真正伪造的模型名）
+
+--------------------------------------------------------------------------------
+ [6b] information-only token（不计入可疑；逐条给 文件:行号 证据）
+--------------------------------------------------------------------------------
+ -- R6 负例/校验夹具（文档明确断言该 id 不存在，或为校验脚本候选列表）--
+   (无)
+ -- R5 基线/参考文件 token --
+   (无)
+
+--------------------------------------------------------------------------------
+ [7] 已知短名/别名核查（形如 gpt-4o / grok-3 / claude-3-7-sonnet 的无斜杠短名）
+--------------------------------------------------------------------------------
+ 说明：短名是别名而非模型 id；本表用于判断是否存在「零对应」（真值 460 模型中
+       完全找不到对应 id）——若被当作真实静态模型写入交付物即违反 C-1。
+ short                  exact_id  same_model_part  substring   verdict
+ claude-3-5-haiku       False     0                0           NOT_IN_DATASET [零对应]
+ claude-3-7-sonnet      False     0                0           NOT_IN_DATASET [零对应]
+ gemini-2.5             False     0                5           PARTIAL_SUBSTRING_ONLY (e.g. google/gemini-2.5-flash-image)
+ gemini-2.5-flash       False     1                3           ALIAS_HAS_REAL_COUNTERPART (e.g. google/gemini-2.5-flash)
+ gemini-2.5-pro         False     1                2           ALIAS_HAS_REAL_COUNTERPART (e.g. google/gemini-2.5-pro)
+ gpt-4o                 False     1                8           ALIAS_HAS_REAL_COUNTERPART (e.g. openai/gpt-4o)
+ gpt-4o-mini            False     1                3           ALIAS_HAS_REAL_COUNTERPART (e.g. openai/gpt-4o-mini)
+ grok-3                 False     0                0           NOT_IN_DATASET [零对应]
+ grok-3-mini            False     0                0           NOT_IN_DATASET [零对应]
+ o1                     False     0                2           PARTIAL_SUBSTRING_ONLY (e.g. sao10k/l3.1-euryale-70b)
+ o3                     False     1                4           ALIAS_HAS_REAL_COUNTERPART (e.g. openai/o3)
+ o4                     False     0                2           PARTIAL_SUBSTRING_ONLY (e.g. upstage/solar-pro4)
+
+ 零对应短名（真值 460 模型中完全找不到对应 id）: 4 个 -> claude-3-5-haiku, claude-3-7-sonnet, grok-3, grok-3-mini
+ 短名出现位置（仅列 DELIVERABLE 类别，最多每种 3 处，含上下文供人工判定是否被当作真实模型）:
+   claude-3-5-haiku ×13 (DELIVERABLE)
+       docs/01-方案初稿.md:67 | | `claude-3-5-haiku` | 0 |
+       docs/01-方案初稿.md:789 | for id in gpt-4o grok-3 claude-3-7-sonnet claude-3-5-haiku gemini-2.5-pro; do
+       docs/01-方案初稿.md:859 | **运行时数据来源（与静态数据严格隔离）**：用户贡献渠道的模型清单必须来自对真实上游 `GET {base_uri}/models` 的实际请求；**未拉取成功时该渠道模型列表为空并标记 `probe_status=u...
+   claude-3-7-sonnet ×25 (DELIVERABLE)
+       docs/01-方案初稿.md:66 | | `claude-3-7-sonnet` | 0 |
+       docs/01-方案初稿.md:789 | for id in gpt-4o grok-3 claude-3-7-sonnet claude-3-5-haiku gemini-2.5-pro; do
+       docs/01-方案初稿.md:859 | **运行时数据来源（与静态数据严格隔离）**：用户贡献渠道的模型清单必须来自对真实上游 `GET {base_uri}/models` 的实际请求；**未拉取成功时该渠道模型列表为空并标记 `probe_status=u...
+   gemini-2.5 ×3 (DELIVERABLE)
+       docs/07-漏洞审查与修复.md:467 | $ grep -rn -E 'gpt-4o|gpt-4o-mini|grok-3|claude-3-7-sonnet|claude-3-5-haiku|gemini-2.5' src/ --include='*.go' ...
+       docs/07-漏洞审查与修复.md:471 | $ grep -rl -E 'gpt-4o|grok-3|claude-3-7-sonnet|gemini-2.5' src/ 2>&1 | sort
+       docs/07-漏洞审查与修复.md:488 | $ grep -n -E 'gpt-4o|grok-3|claude-3-7-sonnet|claude-3-5-haiku|gemini-2.5' LLM-API-Aggregator-Prompt.md SPEC.m...
+   gemini-2.5-pro ×12 (DELIVERABLE)
+       docs/01-方案初稿.md:68 | | `gemini-2.5-pro` | 0 |
+       docs/01-方案初稿.md:789 | for id in gpt-4o grok-3 claude-3-7-sonnet claude-3-5-haiku gemini-2.5-pro; do
+       docs/01-方案初稿.md:859 | **运行时数据来源（与静态数据严格隔离）**：用户贡献渠道的模型清单必须来自对真实上游 `GET {base_uri}/models` 的实际请求；**未拉取成功时该渠道模型列表为空并标记 `probe_status=u...
+   gpt-4o ×32 (DELIVERABLE)
+       docs/01-方案初稿.md:64 | | `gpt-4o` | 0 |
+       docs/01-方案初稿.md:747 | | R2 | 内置能力表手写 `gpt-4o`/`grok-3` 等不存在 id | 违反 C-1 | builtin 表逐字导出自 `data/models-real.json`；§0.4 禁写清单；团队 8 `che...
+       docs/01-方案初稿.md:789 | for id in gpt-4o grok-3 claude-3-7-sonnet claude-3-5-haiku gemini-2.5-pro; do
+   gpt-4o-mini ×1 (DELIVERABLE)
+       docs/07-漏洞审查与修复.md:467 | $ grep -rn -E 'gpt-4o|gpt-4o-mini|grok-3|claude-3-7-sonnet|claude-3-5-haiku|gemini-2.5' src/ --include='*.go' ...
+   grok-3 ×29 (DELIVERABLE)
+       docs/01-方案初稿.md:65 | | `grok-3` | 0 |
+       docs/01-方案初稿.md:747 | | R2 | 内置能力表手写 `gpt-4o`/`grok-3` 等不存在 id | 违反 C-1 | builtin 表逐字导出自 `data/models-real.json`；§0.4 禁写清单；团队 8 `che...
+       docs/01-方案初稿.md:789 | for id in gpt-4o grok-3 claude-3-7-sonnet claude-3-5-haiku gemini-2.5-pro; do
+   o1 ×1 (DELIVERABLE)
+       docs/03-方案审核报告.md:182 | KW=re.compile(r'(gpt|o1|o3|o4|claude|grok|gemini|llama|qwen|deepseek|kimi|mistral|gemma|phi-|command|sonnet|op...
+   o3 ×1 (DELIVERABLE)
+       docs/03-方案审核报告.md:182 | KW=re.compile(r'(gpt|o1|o3|o4|claude|grok|gemini|llama|qwen|deepseek|kimi|mistral|gemma|phi-|command|sonnet|op...
+   o4 ×1 (DELIVERABLE)
+       docs/03-方案审核报告.md:182 | KW=re.compile(r'(gpt|o1|o3|o4|claude|grok|gemini|llama|qwen|deepseek|kimi|mistral|gemma|phi-|command|sonnet|op...
+
+--------------------------------------------------------------------------------
+ [8] 结论
+--------------------------------------------------------------------------------
+ 真值数据         : 460 真实模型 / 69 供应商 / SHA-256 08b4635fd684689feda841f906d59e0dcd8ad9dd57a7c0b7f0667d46b740876a
+                   与 SPEC.md C-1 声明一致: True
+ 数据集副本       : 2 个；'不在真值集合的 id'合计 0（应为 0）；字段值不一致合计 0（应为 0）
+ 可疑编造项       : 0 种（交付物内真正伪造的模型名，逐条证据见 [6]）
+ information-only : 负例/夹具 0 种 + 基线/参考 0 种，逐条证据见 [6b]
+ 零对应短名       : 4 个（别名核查，非 slashed 模型 id；见 [7]）
+ 摘要数据一致性   : 见 [3] 节
+
+ SUMMARY models=460 providers=69 sha256=08b4635fd684689feda841f906d59e0dcd8ad9dd57a7c0b7f0667d46b740876a dataset_copies=2 dataset_fabricated_ids=0 dataset_field_mismatches=0 real_hit_kinds=36 suspicious=0 fabricated_in_deliverables=0 negative_fixtures=0 baseline_info_tokens=0 short_names_zero_counterpart=4 short_names=claude-3-5-haiku,claude-3-7-sonnet,grok-3,grok-3-mini
+ 退出码           : 0（扫描完成；致命/合规判定见 docs/08-功能核实报告.md）
+================================================================================

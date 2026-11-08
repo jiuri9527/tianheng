@@ -1,0 +1,2 @@
+--- avatar 上传并发/大小读取路径 ---
+src/internal/avatar/validate.go:75:		data, nerr = io.ReadAll(io.LimitReader(part, maxAvatarBytes+1))

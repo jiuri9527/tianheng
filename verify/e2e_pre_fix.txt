@@ -1,0 +1,184 @@
+====================================================================
+ verify/e2e.sh · 端到端真实执行核实
+====================================================================
+ ROOT        : /Users/jiuri/Desktop/Tianheng
+ BASE        : http://127.0.0.1:18080
+ PORT        : 18080
+ EVIDENCE    : /tmp/llm-hub-e2e-evidence.RYPrsR
+ go          : go version go1.27.2 darwin/arm64
+ curl        : curl 8.7.1 (x86_64-apple-darwin26.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.69.0
+ python3     : Python 3.9.6
+ TIMESTAMP   : 2026-11-07 21:32:08 +0800
+====================================================================
+
+--------------------------------------------------------------------
+ [S0] go build ./src/cmd/server  (真实编译，输出原样保留)
+--------------------------------------------------------------------
+ BUILD_EXIT  : 0
+ BUILD_STDOUT: 
+ BUILD_STDERR: 
+ BUILD_OK    : True  BIN=/tmp/llm-hub-e2e-server-30997  bytes=11996146
+
+--------------------------------------------------------------------
+ [S1] 后台启动服务并等待 /healthz（最多 20 次 × 0.5s）
+--------------------------------------------------------------------
+ SERVER_PID  : 31022
+ SERVER_LOG  : /tmp/llm-hub-e2e-server-30997.log
+ READY       : True (attempt 7, /healthz=200)
+ SERVER_UP   : True
+ SERVER_LOG_TAIL:
+    2026/11/07 21:32:12 已引导管理员账号: e2e-admin@llm-hub.local
+    llm-hub 启动于 :18080，真实模型池来源 data/models-real.json（460 条）
+
+--------------------------------------------------------------------
+ [S2] GET /healthz · GET /metrics · /api/* 无效令牌 401
+--------------------------------------------------------------------
+  [CHECK 1] healthz
+    REQUEST     : GET /healthz
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"channels":0,"discovered_models":0,"real_models":460,"real_models_source":"data/models-real.json","status":"ok","time":1794058333,"users":1} 
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/01_healthz.body
+  [CHECK 2] metrics
+    REQUEST     : GET /metrics
+    HTTP_STATUS : 200
+    BODY_SNIPPET: # HELP llmhub_requests_total Total requests by model/channel/status. # TYPE llmhub_requests_total counter # HELP llmhub_ttft_seconds Time to first token (sum/count). # TYPE llmhub_ttft_seconds summary llmhub_ttft_seconds_sum 0.000000 llmhub_ttft_seconds_count 0 # HELP llmhub_tokens_total Total tokens by type. # TYPE ll
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/02_metrics.body
+  [CHECK 3] api_me_invalid_token
+    REQUEST     : GET /api/me
+    HTTP_STATUS : 401
+    BODY_SNIPPET: {"error":{"message":"JWT 格式错误","type":"invalid_request_error","code":"invalid_token","request_id":"1823fb96ff18497d9ed16ce8"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/03_api_me_invalid_token.body
+
+--------------------------------------------------------------------
+ [S3] 注册 / 登录 / 创建 sk- 令牌（真实响应，解析失败如实打印）
+--------------------------------------------------------------------
+  [CHECK 4] auth_register
+    REQUEST     : POST /api/auth/register
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"tokens":{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNWNjOGI2Mjc2ZWRkNzgwYWI3ZjdiMzdmIiwicm9sZSI6InVzZXIiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk0MTQ0NzMzLCJpYXQiOjE3OTQwNTgzMzN9.zPA4Ze968JL8jM1-ERLQpNcr87eaGIVLRdZtYYXFZUI","refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNWNj
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/04_auth_register.body
+  [CHECK 5] auth_login
+    REQUEST     : POST /api/auth/login
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"tokens":{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNWNjOGI2Mjc2ZWRkNzgwYWI3ZjdiMzdmIiwicm9sZSI6InVzZXIiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk0MTQ0NzMzLCJpYXQiOjE3OTQwNTgzMzN9.zPA4Ze968JL8jM1-ERLQpNcr87eaGIVLRdZtYYXFZUI","refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNWNj
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/05_auth_login.body
+  JWT_ACQUIRED  : True (len=217)
+  [CHECK 6] tokens_create
+    REQUEST     : POST /api/tokens
+    HTTP_STATUS : 200
+    BODY_SNIPPET: {"allowed_models":[],"created_at":1794058334,"expires_at":0,"id":"tok_803fbc73a5341ca217a526ba","ip_allowlist":null,"key_hint":"****5847","last_used_at":0,"max_concurrency":8,"name":"e2e-token","quota_usd":10,"rpm":2,"status":"active","token":"sk-469cb702ec2b4a258e94387ef0b55847","tpm":200000,"used_usd":0} 
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/06_tokens_create.body
+  SK_ACQUIRED   : True (len=35)
+
+--------------------------------------------------------------------
+ [S4] GET /v1/models（真实模型 + 数量核对 + id ∈ data/models-real.json）
+--------------------------------------------------------------------
+  [CHECK 7] v1_models
+    REQUEST     : GET /v1/models
+    HTTP_STATUS : 402
+    BODY_SNIPPET: {"error":{"message":"account balance exhausted","type":"insufficient_quota","code":"insufficient_quota","request_id":"f459cc57ac0e58650ebe6592"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/07_v1_models.body
+  NO_DATA_ARRAY    : True  keys= ['error']
+
+--------------------------------------------------------------------
+ [S5] POST /v1/chat/completions（无上游凭据：统一 upstream_error，响应体不含伪造模型输出）
+--------------------------------------------------------------------
+  MODEL_USED (真实 id，取自 data/models-real.json): liquid/lfm-3-1.7b
+  [CHECK 8] v1_chat_completions
+    REQUEST     : POST /v1/chat/completions
+    HTTP_STATUS : 402
+    BODY_SNIPPET: {"error":{"message":"account balance exhausted","type":"insufficient_quota","code":"insufficient_quota","request_id":"f78c8dedff6c7ee6c3f842c0"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/08_v1_chat_completions.body
+  ERROR_TYPE_FIELD : insufficient_quota
+  HAS_UPSTREAM_ERROR   : False
+  HAS_CHOICES_KEY      : False
+  HAS_CONTENT_KEY      : False
+  FABRICATED_OUTPUT    : False
+  VERDICT              : CHECK(见上列事实)
+
+--------------------------------------------------------------------
+ [S6] POST /v1/messages（Anthropic Messages 兼容入口，无上游凭据）
+--------------------------------------------------------------------
+  [CHECK 9] v1_messages
+    REQUEST     : POST /v1/messages
+    HTTP_STATUS : 402
+    BODY_SNIPPET: {"error":{"message":"account balance exhausted","type":"insufficient_quota","code":"insufficient_quota","request_id":"0c2b49ca1b2819c481d972fb"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/09_v1_messages.body
+  HAS_UPSTREAM_ERROR   : False
+  HAS_CHOICES_KEY      : False
+  HAS_CONTENT_KEY      : False
+  FABRICATED_OUTPUT    : False
+  VERDICT              : CHECK(见上列事实)
+
+--------------------------------------------------------------------
+ [S7] RPM 限流（RATE_RPM_DEFAULT=3，连续 8 次 GET /v1/models 记录真实状态码）
+--------------------------------------------------------------------
+  RPM_REQ_1 : HTTP 402
+  RPM_REQ_2 : HTTP 402
+  RPM_REQ_3 : HTTP 402
+  RPM_REQ_4 : HTTP 402
+  RPM_REQ_5 : HTTP 402
+  RPM_REQ_6 : HTTP 402
+  RPM_REQ_7 : HTTP 402
+  RPM_REQ_8 : HTTP 402
+  HTTP_429_COUNT : 0
+  VERDICT        : NO_429_OBSERVED(如实记录，未观察到限流命中)
+
+--------------------------------------------------------------------
+ [S8] SSRF 防护（提交内网/回环/元数据 base_uri 必须被拒）
+--------------------------------------------------------------------
+  [CHECK 10] ssrf_1
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"provider_type 必填","type":"invalid_request_error","code":"channel_create_failed","request_id":"5fae03b98052030751933a85"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/10_ssrf_1.body
+  [CHECK 11] ssrf_2
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"provider_type 必填","type":"invalid_request_error","code":"channel_create_failed","request_id":"d201a4989adcfd312f26e884"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/11_ssrf_2.body
+  [CHECK 12] ssrf_3
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"provider_type 必填","type":"invalid_request_error","code":"channel_create_failed","request_id":"de6d0eaf29632737421d6800"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/12_ssrf_3.body
+  [CHECK 13] ssrf_4
+    REQUEST     : POST /api/channels
+    HTTP_STATUS : 400
+    BODY_SNIPPET: {"error":{"message":"provider_type 必填","type":"invalid_request_error","code":"channel_create_failed","request_id":"35bc56fd5eecfd5dc4687d76"}}
+    BODY_FILE   : /tmp/llm-hub-e2e-evidence.RYPrsR/13_ssrf_4.body
+  SSRF_BASE_URIS_TESTED : 4 (127.0.0.1 / 169.254.169.254 / file:// / 10.0.0.1)
+  说明：仅凭状态码不足以判定防护生效，需结合响应体与服务端日志；上方为真实 curl 输出。
+
+====================================================================
+ [S9] 真实执行汇总（数值均来自上方 curl 与 python3 解析）
+====================================================================
+ BUILD_OK            : True
+ SERVER_UP           : True
+ SERVER_PID          : 31022
+ JWT_ACQUIRED        : True
+ SK_ACQUIRED         : True
+ TOTAL_CURL_CHECKS   : 13
+ EVIDENCE_DIR        : /tmp/llm-hub-e2e-evidence.RYPrsR
+ STATUS_FILES        :
+   01_healthz.status = 200
+   02_metrics.status = 200
+   03_api_me_invalid_token.status = 401
+   04_auth_register.status = 200
+   05_auth_login.status = 200
+   06_tokens_create.status = 200
+   07_v1_models.status = 402
+   08_v1_chat_completions.status = 402
+   09_v1_messages.status = 402
+   10_ssrf_1.status = 400
+   11_ssrf_2.status = 400
+   12_ssrf_3.status = 400
+   13_ssrf_4.status = 400
+====================================================================
+
+--------------------------------------------------------------------
+ [CLEANUP] 清理真实启动的进程与临时二进制
+  killed SERVER_PID=31022
+  removed BIN=/tmp/llm-hub-e2e-server-30997
+  evidence dir kept: /tmp/llm-hub-e2e-evidence.RYPrsR
+--------------------------------------------------------------------

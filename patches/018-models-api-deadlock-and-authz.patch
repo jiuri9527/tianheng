@@ -1,0 +1,77 @@
+diff --git a/src/internal/api/models_api.go b/src/internal/api/models_api.go
+--- a/src/internal/api/models_api.go
++++ b/src/internal/api/models_api.go
+@@ -124,6 +124,9 @@
+ }
+ 
+ func (s *Server) updateModel(w http.ResponseWriter, r *http.Request) {
++	if _, ok := requireAdmin(w, r); !ok {
++		return
++	}
+ 	id := r.PathValue("id")
+ 	var in struct {
+ 		Enabled      *bool           `json:"enabled"`
+@@ -140,14 +143,15 @@
+ 		if in.Alias != "" {
+ 			m.Alias = in.Alias
+ 		}
+-		if len(in.PriceOverride) > 0 {
+-			// 定价覆盖记录到别名层
+-			s.St.UpsertAlias(&store.ModelAlias{
+-				Alias: in.Alias, PriceOverride: in.PriceOverride, Enabled: true,
+-				CreatedAt: time.Now().Unix(),
+-			})
+-		}
+-	})
++	})
++	if ok && len(in.PriceOverride) > 0 {
++		// UpsertAlias 自身会取 store 锁，必须在 UpdateModel 闭包外调用，
++		// 否则同一把 sync.RWMutex 被重入导致整个进程死锁（CWE-833）。
++		s.St.UpsertAlias(&store.ModelAlias{
++			Alias: in.Alias, PriceOverride: in.PriceOverride, Enabled: true,
++			CreatedAt: time.Now().Unix(),
++		})
++	}
+ 	if !ok {
+ 		fail(w, r, http.StatusNotFound, "invalid_request_error", "not_found", "runtime model not found")
+ 		return
+@@ -157,6 +161,9 @@
+ }
+ 
+ func (s *Server) probeModel(w http.ResponseWriter, r *http.Request) {
++	if _, ok := requireAdmin(w, r); !ok {
++		return
++	}
+ 	id := r.PathValue("id")
+ 	m, ok := s.St.GetModel(id)
+ 	if !ok {
+@@ -191,6 +198,9 @@
+ }
+ 
+ func (s *Server) createAlias(w http.ResponseWriter, r *http.Request) {
++	if _, ok := requireAdmin(w, r); !ok {
++		return
++	}
+ 	var in struct {
+ 		Alias            string          `json:"alias"`
+ 		CanonicalModelID string          `json:"canonical_model_id"`
+@@ -218,6 +228,9 @@
+ }
+ 
+ func (s *Server) updateAlias(w http.ResponseWriter, r *http.Request) {
++	if _, ok := requireAdmin(w, r); !ok {
++		return
++	}
+ 	name := r.PathValue("alias")
+ 	a, ok := s.St.GetAlias(name)
+ 	if !ok {
+@@ -249,6 +262,9 @@
+ }
+ 
+ func (s *Server) deleteAlias(w http.ResponseWriter, r *http.Request) {
++	if _, ok := requireAdmin(w, r); !ok {
++		return
++	}
+ 	name := r.PathValue("alias")
+ 	s.St.DeleteAlias(name)
+ 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "alias": name})

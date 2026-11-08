@@ -1,0 +1,81 @@
+--- a/src/internal/telemetry/telemetry.go
++++ b/src/internal/telemetry/telemetry.go
+@@ -23,9 +23,13 @@
+ 	"encoding/json"
+ 	"fmt"
+ 	"net/http"
++	"os"
+ 	"regexp"
+ 	"sort"
++	"strconv"
+ 	"strings"
++	"sync"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"llm-hub/src/internal/auth"
+@@ -40,6 +44,13 @@
+ 	bucketCount    = windowSeconds / bucketSeconds // 60 个桶
+ 	qpsWindow      = 60               // QPS 统计窗口：最近 60 秒
+ 	streamInterval = 2 * time.Second  // SSE 推送间隔
++	// V-37 修复：无上限的并发 SSE 流 + 每连接独立全量聚合可被单台主机
++	// 打成资源耗尽（N 连接 = 每 2s N 次全量 request_logs 扫描 + N 个常驻
++	// goroutine）。streamMaxConns 限制同时打开的流，streamMaxConnsEnv
++	// 可用环境变量覆盖；cachedAggregate 让同一 tick 内所有连接共享同一
++	// 份聚合结果（每 interval 只算一次）。
++	streamMaxConns    = 256
++	streamMaxConnsEnv = "TELEMETRY_STREAM_MAX_CONNS"
+ )
+ 
+ // GroupStat 是某一维度下某个分类键的聚合数字。
+@@ -437,6 +448,19 @@
+ 			"ResponseWriter does not implement http.Flusher")
+ 		return
+ 	}
++	maxConns := streamMaxConns
++	if v := os.Getenv(streamMaxConnsEnv); v != "" {
++		if n, err := strconv.Atoi(v); err == nil && n > 0 {
++			maxConns = n
++		}
++	}
++	if cur := streamConns.Add(1); cur > int64(maxConns) {
++		streamConns.Add(-1)
++		writeErr(w, r, http.StatusServiceUnavailable, "too_many_streams",
++			"telemetry stream connection limit reached")
++		return
++	}
++	defer streamConns.Add(-1)
+ 	hdr := w.Header()
+ 	hdr.Set("Content-Type", "text/event-stream")
+ 	hdr.Set("Cache-Control", "no-cache, no-transform")
+@@ -468,8 +492,29 @@
+ 	}
+ }
+ 
++var streamConns atomic.Int64
++
++var (
++	snapMu       sync.Mutex
++	snapCached   Snapshot
++	snapCachedAt time.Time
++)
++
++// cachedAggregate 同一 streamInterval 内的所有连接共享同一份聚合：
++// 每 interval 至多执行一次全量扫描，防止 N 连接放大成 N 次聚合。
++func cachedAggregate(st *store.Store, now time.Time) Snapshot {
++	snapMu.Lock()
++	defer snapMu.Unlock()
++	if now.Sub(snapCachedAt) < streamInterval && !snapCachedAt.IsZero() {
++		return snapCached
++	}
++	snapCached = aggregate(st, now)
++	snapCachedAt = now
++	return snapCached
++}
++
+ func (h *handler) writeFrame(w http.ResponseWriter, f http.Flusher) error {
+-	b, err := json.Marshal(aggregate(h.st, time.Now()))
++	b, err := json.Marshal(cachedAggregate(h.st, time.Now()))
+ 	if err != nil {
+ 		return err
+ 	}

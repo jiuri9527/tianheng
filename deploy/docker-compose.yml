@@ -1,0 +1,73 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: llm-hub:local
+    container_name: llm-hub-app
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8080"
+      SERVER_BASE_URL: "http://localhost"
+      ENV: "production"
+      LOG_LEVEL: "info"
+      MODELS_REAL_PATH: "/app/data/models-real.json"
+      MODELS_SYNC_CRON: "0 */6 * * *"
+      PROBE_ENABLED: "true"
+      PROBE_MAX_TOKENS: "16"
+      PROBE_TIMEOUT_SEC: "30"
+      MASTER_KEY: "${MASTER_KEY:?set MASTER_KEY in deploy/.env}"
+      STATE_DIR: "/app/state"
+      STATE_FLUSH_MS: "250"
+      JWT_SECRET: "${JWT_SECRET:?set JWT_SECRET in deploy/.env}"
+      JWT_TTL_MIN: "1440"
+      DEFAULT_TIMEOUT_SEC: "180"
+      MAX_FAILOVER: "3"
+      CIRCUIT_COOLDOWN_SEC: "30"
+      HEALTH_CHECK_INTERVAL_SEC: "60"
+      MAX_BODY_MB: "20"
+      SCHEDULER_WORKERS: "32"
+      SCHEDULER_QUEUE_CAPACITY: "65536"
+      STREAMPIPE_BUFFER_BYTES: "65536"
+      POOL_MAX_IDLE: "64"
+      RATE_RPM_DEFAULT: "60"
+      RATE_TPM_DEFAULT: "200000"
+      RATE_CONCURRENCY_DEFAULT: "8"
+      CONTRIBUTOR_REWARD_RATE: "0.15"
+      QUOTA_DECIMALS: "6"
+      SSRF_DENY_PRIVATE: "true"
+      SSRF_DNS_RECHECK: "true"
+      LOG_FULL_BODY: "true"
+      LOG_MASK_KEYS: "true"
+      CORS_ORIGINS: "*"
+      REGISTRATION_OPEN: "true"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@localhost}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?set ADMIN_PASSWORD in deploy/.env}"
+    volumes:
+      - ../data:/app/data:ro
+      - app-state:/app/state
+      - app-logs:/app/logs
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: llm-hub-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  app-state:
+  app-logs:

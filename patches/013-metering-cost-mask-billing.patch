@@ -1,0 +1,88 @@
+diff --git a/src/internal/metering/metering.go b/src/internal/metering/metering.go
+--- a/src/internal/metering/metering.go
++++ b/src/internal/metering/metering.go
+@@ -5,6 +5,7 @@
+ import (
+ 	"context"
+ 	"encoding/json"
++	"math"
+ 	"regexp"
+ 	"sync"
+ 	"time"
+@@ -119,13 +120,20 @@
+ 	return (n + 3) / 4
+ }
+ 
+-var skPattern = regexp.MustCompile(`sk-[A-Za-z0-9_-]{4,}`)
++var (
++	skPattern     = regexp.MustCompile(`sk-[A-Za-z0-9_-]{4,}`)
++	bearerPattern = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/=-]{8,}`)
++	apiKeyPattern = regexp.MustCompile(`(?i)(x-api-key|api[_-]?key)["'\s:=]+[A-Za-z0-9._~+/=-]{8,}`)
++)
+ 
+ func (m *Meter) mask(s string) string {
+ 	if m.Cfg == nil || !m.Cfg.LogMaskKeys {
+ 		return s
+ 	}
+-	return skPattern.ReplaceAllString(s, "****")
++	s = skPattern.ReplaceAllString(s, "****")
++	s = bearerPattern.ReplaceAllString(s, "Bearer ****")
++	s = apiKeyPattern.ReplaceAllString(s, "$1=****")
++	return s
+ }
+ 
+ func (m *Meter) writeNow(rec *Record) {
+@@ -139,6 +147,9 @@
+ 	// 计费：价格取自真实发现的模型（上游定价），无价格则为 0，绝不编造
+ 	if rec.CostUSD == 0 {
+ 		rec.CostUSD = m.computeCost(rec)
++	}
++	if math.IsNaN(rec.CostUSD) || math.IsInf(rec.CostUSD, 0) || rec.CostUSD < 0 {
++		rec.CostUSD = 0
+ 	}
+ 
+ 	reqBody := json.RawMessage(m.mask(string(rec.RequestBody)))
+@@ -190,24 +201,26 @@
+ 	}
+ 	in := float64(rec.PromptTokens) / 1e6 * model.InputPricePerMtok
+ 	out := float64(rec.CompletionTokens) / 1e6 * model.OutputPricePerMtok
+-	return in + out
++	c := in + out
++	// 非有限/负数/异常量级花费一律归零：NaN 会写进 UsageDaily 使 json.Marshal 永久失败。
++	if math.IsNaN(c) || math.IsInf(c, 0) || c < 0 || c > 1e6 {
++		return 0
++	}
++	return c
+ }
+ 
+ func (m *Meter) applyBilling(rec *Record) {
+-	m.mu.Lock()
+-	defer m.mu.Unlock()
+-	if rec.Token != nil && rec.CostUSD > 0 {
+-		rec.Token.UsedUSD += rec.CostUSD
+-		rec.Token.LastUsedAt = time.Now().Unix()
+-	}
+-	if rec.CostUSD > 0 {
+-		m.St.AdjustQuota(rec.UserID, -rec.CostUSD, "consumption", rec.RequestID)
+-	}
+-	// 贡献 public 渠道按被他人调用量返还奖励额度
++	if rec.CostUSD <= 0 || math.IsNaN(rec.CostUSD) || math.IsInf(rec.CostUSD, 0) {
++		return
++	}
++	var tokenID string
++	if rec.Token != nil {
++		tokenID = rec.Token.ID
++	}
++	reward := 0.0
+ 	if rec.ContributorUserID != "" && rec.ContributorUserID != rec.UserID && rec.RewardRate > 0 {
+-		reward := rec.CostUSD * rec.RewardRate
+-		if reward > 0 {
+-			m.St.AdjustQuota(rec.ContributorUserID, reward, "contribution_reward", rec.RequestID)
+-		}
+-	}
+-}
++		reward = rec.CostUSD * rec.RewardRate
++	}
++	// 全部额度变更在 store 同一把锁下原子完成，避免并发丢更新/双花。
++	m.St.ApplyBilling(tokenID, rec.UserID, rec.ContributorUserID, rec.CostUSD, reward, rec.RequestID)
++}

@@ -1,0 +1,126 @@
+diff --git a/src/internal/discovery/discovery.go b/src/internal/discovery/discovery.go
+--- a/src/internal/discovery/discovery.go
++++ b/src/internal/discovery/discovery.go
+@@ -122,10 +122,11 @@
+ 	models, err := d.ListModels(ctx, ch)
+ 	if err != nil {
+ 		d.St.DeleteModelsByChannel(ch.ID)
+-		ch.ProbeStatus = "unavailable"
+-		ch.LastError = err.Error()
+-		ch.HealthCheckedAt = time.Now().Unix()
+-		d.St.UpdateChannel(ch)
++		d.St.UpdateChannelLocked(ch.ID, func(c *store.Channel) {
++			c.ProbeStatus = "unavailable"
++			c.LastError = err.Error()
++			c.HealthCheckedAt = time.Now().Unix()
++		})
+ 		return SyncResult{OK: false, Models: []*store.Model{}, Error: err.Error()}
+ 	}
+ 	// 成功：先移除该渠道旧的模型，再逐字按真实上游条目重建（避免残留编造/占位）。
+@@ -151,11 +152,12 @@
+ 		})
+ 		out = append(out, m)
+ 	}
+-	ch.ProbeStatus = "ok"
+-	ch.LastError = ""
+-	ch.FailCount = 0
+-	ch.HealthCheckedAt = time.Now().Unix()
+-	d.St.UpdateChannel(ch)
++	d.St.UpdateChannelLocked(ch.ID, func(c *store.Channel) {
++		c.ProbeStatus = "ok"
++		c.LastError = ""
++		c.FailCount = 0
++		c.HealthCheckedAt = time.Now().Unix()
++	})
+ 	return SyncResult{OK: true, Models: out, Discovered: len(out)}
+ }
+ 
+diff --git a/src/internal/router/router.go b/src/internal/router/router.go
+--- a/src/internal/router/router.go
++++ b/src/internal/router/router.go
+@@ -136,29 +136,29 @@
+ 	r.Selector.Report(kernel.Channel{ID: ch.ID}, result)
+ 	r.mu.Lock()
+ 	defer r.mu.Unlock()
+-	if !result.OK || result.Status == 429 || result.Status >= 500 || result.Err != nil {
+-		ch.FailCount++
+-		ch.CooldownUntil = time.Now().Add(r.Cooldown).Unix()
+-		if result.Err != nil {
+-			ch.LastError = result.Err.Error()
++	r.St.UpdateChannelLocked(ch.ID, func(c *store.Channel) {
++		if !result.OK || result.Status == 429 || result.Status >= 500 || result.Err != nil {
++			c.FailCount++
++			c.CooldownUntil = time.Now().Add(r.Cooldown).Unix()
++			if result.Err != nil {
++				c.LastError = result.Err.Error()
++			} else {
++				c.LastError = "upstream status " + itoa(result.Status)
++			}
+ 		} else {
+-			ch.LastError = "upstream status " + itoa(result.Status)
++			c.FailCount = 0
++			c.CooldownUntil = 0
++			c.LastError = ""
+ 		}
+-	} else {
+-		ch.FailCount = 0
+-		ch.CooldownUntil = 0
+-		ch.LastError = ""
+-	}
+-	ch.HealthCheckedAt = time.Now().Unix()
+-	r.St.UpdateChannel(ch)
++		c.HealthCheckedAt = time.Now().Unix()
++	})
+ }
+ 
+ // SetCooldown 手动设置冷却（管理面/健康检查）。
+ func (r *Router) SetCooldown(id string, until time.Time) {
+-	if ch, ok := r.St.GetChannel(id); ok {
++	r.St.UpdateChannelLocked(id, func(ch *store.Channel) {
+ 		ch.CooldownUntil = until.Unix()
+-		r.St.UpdateChannel(ch)
+-	}
++	})
+ 	if s, ok := r.Selector.(interface{ SetCooldown(string, time.Time) }); ok {
+ 		s.SetCooldown(id, until)
+ 	}
+diff --git a/src/internal/health/health.go b/src/internal/health/health.go
+--- a/src/internal/health/health.go
++++ b/src/internal/health/health.go
+@@ -112,20 +112,23 @@
+ 	models, err := c.Discoverer.ListModels(checkCtx, ch)
+ 	c.mu.Lock()
+ 	defer c.mu.Unlock()
+-	ch.HealthCheckedAt = time.Now().Unix()
+-	if err != nil {
+-		ch.FailCount++
+-		ch.LastError = err.Error()
+-		if c.Router != nil {
+-			c.Router.SetCooldown(ch.ID, time.Now().Add(30*time.Second))
++	failed := err != nil
++	// store 锁内只改渠道字段；Router.SetCooldown 内部也会取 store 锁，
++	// 必须放在锁外调用，避免 self-deadlock。
++	c.St.UpdateChannelLocked(ch.ID, func(cc *store.Channel) {
++		cc.HealthCheckedAt = time.Now().Unix()
++		if failed {
++			cc.FailCount++
++			cc.LastError = err.Error()
++			cc.CooldownUntil = time.Now().Add(30 * time.Second).Unix()
+ 		} else {
+-			ch.CooldownUntil = time.Now().Add(30 * time.Second).Unix()
++			cc.FailCount = 0
++			cc.LastError = ""
++			cc.CooldownUntil = 0
++			_ = models
+ 		}
+-	} else {
+-		ch.FailCount = 0
+-		ch.LastError = ""
+-		ch.CooldownUntil = 0
+-		_ = models // 轻量探测成功即视为健康，不改动已发现的真实模型
++	})
++	if failed && c.Router != nil {
++		c.Router.SetCooldown(ch.ID, time.Now().Add(30*time.Second))
+ 	}
+-	c.St.UpdateChannel(ch)
+ }

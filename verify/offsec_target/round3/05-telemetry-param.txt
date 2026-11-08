@@ -1,0 +1,9 @@
+=== [E] telemetry 参数滥用（负数/超大/注入）===
+  ?window=-1 → HTTP ��应 400）
+  ?window=99999999 → HTTP ��应 400）
+  ?window=60;DROP → HTTP ��应 400）
+  ?bucket=0 → HTTP ��应 400）
+  ?window=60&bucket=7 → HTTP ��应 400）
+  ?window=1e9 → HTTP ��应 400）
+  ?window[]=60 → HTTP ��应 400）
+  合法 window=60&bucket=10 → HTTP 423（应 200）

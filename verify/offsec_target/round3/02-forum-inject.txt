@@ -1,0 +1,4 @@
+=== [B] 编辑接口注入（XSS/SSTI/超长）===
+  inject1 → title='' len(content)=0
+  inject2 → title='{{7*7}}' len(content)=21
+  inject3 → title='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' len(content)=20000

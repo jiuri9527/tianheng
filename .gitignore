@@ -1,0 +1,31 @@
+# ===== 天衡 Tianheng · .gitignore =====
+
+# 依赖与构建产物
+web/node_modules/
+web/.next/
+web/out/
+
+# 运行时状态（JSON 存储 / WAL / 完整性链 / 头像 / 论坛 / 亲和 / 路由日志）
+.tianheng-data/
+.llmhub-data/
+tianheng-data/
+*.state/
+state/
+**/affinity.json
+**/groups.json
+
+# 真实环境变量（只有 .env.example 进仓库）
+.env
+.env.*
+!.env.example
+
+# 日志与临时文件
+*.log
+*.pid
+nohup.out
+.DS_Store
+
+# 本机工具产物
+.zion-mcp/
+*.tmp
+__pycache__/

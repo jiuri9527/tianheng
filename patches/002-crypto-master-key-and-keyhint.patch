@@ -1,0 +1,33 @@
+diff --git a/src/internal/crypto/crypto.go b/src/internal/crypto/crypto.go
+--- a/src/internal/crypto/crypto.go
++++ b/src/internal/crypto/crypto.go
+@@ -26,17 +26,11 @@
+ 	key []byte
+ }
+ 
+-// devMasterKey 在没有配置 MASTER_KEY 时派生一个稳定的开发密钥。
+-// 生产环境必须通过 MASTER_KEY 注入；否则每次进程启动都相同，仅用于本地联调与测试。
+-func devMasterKey() []byte {
+-	h := sha256.Sum256([]byte("llm-hub::development-master-key::v1"))
+-	return h[:]
+-}
+-
+-// NewCipher 依据 base64 主密钥构造 Cipher。传入空串时使用稳定的开发密钥。
++// NewCipher 依据 base64 主密钥构造 Cipher。MASTER_KEY 缺失时拒绝启动，
++// 绝不回退到源码内可推导的开发密钥（否则所有未配置部署共享同一把 AES 主密钥）。
+ func NewCipher(masterKeyB64 string) (*Cipher, error) {
+ 	if strings.TrimSpace(masterKeyB64) == "" {
+-		return &Cipher{key: devMasterKey()}, nil
++		return nil, errors.New("MASTER_KEY 未配置：拒绝使用开发派生密钥，请注入 32 字节 base64 主密钥")
+ 	}
+ 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(masterKeyB64))
+ 	if err != nil {
+@@ -102,7 +96,7 @@
+ func KeyHint(secret string) string {
+ 	s := strings.TrimSpace(secret)
+ 	if len(s) <= 4 {
+-		return "****" + s
++		return "****" // 短密钥不得回显任何字符，避免完整明文出现在 key_hint / 日志
+ 	}
+ 	return "****" + s[len(s)-4:]
+ }

@@ -1,0 +1,5 @@
+=== V-39 复测：单源路径穿越攻击后站点仍可用 ===
+  level=throttle sealed=False blocked_ips=1
+  /api/rankings              429
+  /api/telemetry/snapshot    429
+  /v1/models                 429

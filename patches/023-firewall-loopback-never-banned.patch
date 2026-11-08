@@ -1,0 +1,21 @@
+--- a/src/internal/firewall/firewall.go
++++ b/src/internal/firewall/firewall.go
+@@ -488,6 +488,18 @@
+ 
+ 	action := "score"
+ 	bannedNow := false
++	// V-40 修复：回环来源（本机运维、健康检查、本地监控、同机反代）不做 IP 封禁。
++	//   修复前：单机/容器化部署下客户端就是 127.0.0.1，一次探测就会把运维自身
++	//   封 5 分钟，导致「攻击检测」变成「自我 DoS」。回环事件仍完整记录
++	//   （可见性不丢），但不进入封禁与全局升级路径。
++	if isLoopback(ip) {
++		f.recordLocked(Event{
++			IP: ip, Method: r.Method, Path: r.URL.Path, Rule: rule,
++			Severity: sev, Action: "observe_loopback", Detail: detail,
++			RequestID: r.Header.Get("X-Request-Id"),
++		})
++		return
++	}
+ 	if rec.score >= f.cfg.BlockScore && !time.Now().Before(rec.blockedUntil) {
+ 		rec.blockedUntil = time.Now().Add(f.cfg.BlockTTL)
+ 		bannedNow = true

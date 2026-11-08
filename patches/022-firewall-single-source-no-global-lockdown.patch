@@ -1,0 +1,49 @@
+--- a/src/internal/firewall/firewall.go
++++ b/src/internal/firewall/firewall.go
+@@ -339,6 +339,19 @@
+ }
+ 
+ func mustJSON(v interface{}) []byte { b, _ := json.MarshalIndent(v, "", "  "); return b }
++
++// countBlockedExternalLocked 只统计非回环来源的被封 IP：本机运维、健康检查、
++// 内部监控不应把站点推向全局封存（V-39）。
++func (f *Firewall) countBlockedExternalLocked() int {
++	now := time.Now()
++	n := 0
++	for ip, rec := range f.ips {
++		if now.Before(rec.blockedUntil) && !isLoopback(ip) {
++			n++
++		}
++	}
++	return n
++}
+ 
+ func (f *Firewall) countBlockedLocked() int {
+ 	n := 0
+@@ -485,9 +498,23 @@
+ 			f.level = LevelBlock
+ 		}
+ 	}
+-	needLockdown := bannedNow && f.countBlockedLocked() >= f.cfg.LockdownIPThreshold
+-	if sev == "critical" && rec.hits >= 2 && rec.score >= f.cfg.BlockScore {
+-		needLockdown = true // 持续高危攻击
++	// V-39 修复：全局 lockdown 只能由「多源协同攻击」触发，不能被单一来源
++	// 的重复探测放大成全站不可用。
++	//   修复前：sev==critical && hits>=2 && score>=BlockScore 就 lockdown，
++	//           意味着同一台主机发两次路径穿越探测即可让所有用户收到 423，
++	//           攻击者用 2 个请求就能把站点打成不可用（可用性 DoS 放大）。
++	//   修复后：单 IP 只做自身封禁（429，BlockTTL 内），全局封存必须同时满足
++	//           ① 该 IP 已被封禁；② 被封 IP 数达到 LockdownIPThreshold（≥2）；
++	//           ③ 本机回环/内网来源不参与全局升级（运维与健康检查不受影响）。
++	needLockdown := false
++	if bannedNow && f.cfg.LockdownIPThreshold >= 2 {
++		if blocked := f.countBlockedLocked(); blocked >= f.cfg.LockdownIPThreshold {
++			// 统计被封 IP 中来自外部（非回环）的数量，回环不参与升级。
++			if f.countBlockedExternalLocked() >= f.cfg.LockdownIPThreshold {
++				needLockdown = true
++			}
++			_ = blocked
++		}
+ 	}
+ 
+ 	f.recordLocked(Event{

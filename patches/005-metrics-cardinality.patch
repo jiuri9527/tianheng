@@ -1,0 +1,64 @@
+diff --git a/src/internal/rt/streampipe.go b/src/internal/rt/streampipe.go
+--- a/src/internal/rt/streampipe.go
++++ b/src/internal/rt/streampipe.go
+@@ -5,6 +5,7 @@
+ 	"context"
+ 	"io"
+ 	"net/http"
++	"strings"
+ 	"sync"
+ 	"sync/atomic"
+ 
+@@ -64,16 +65,47 @@
+ // GlobalMetrics 单例。
+ var GlobalMetrics = &Metrics{}
+ 
+-// AddRequest 累加请求计数。
++const (
++	maxMetricPartLen = 128
++	maxMetricKeys    = 10000
++)
++
++var metricKeyCount int64
++
++// metricPart 清洗指标键分量：剔除分隔符与控制字符并限长，防止键注入与无界增长。
++func metricPart(s string) string {
++	s = strings.Map(func(r rune) rune {
++		if r == '|' || r < 0x20 || r == 0x7f {
++			return '_'
++		}
++		return r
++	}, s)
++	if len(s) > maxMetricPartLen {
++		s = s[:maxMetricPartLen]
++	}
++	return s
++}
++
++// AddRequest 累加请求计数（键基数有上限，超过归入 other 桶）。
+ func (m *Metrics) AddRequest(model, channel, status string) {
+-	key := model + "|" + channel + "|" + status
+-	v, _ := m.RequestsTotal.LoadOrStore(key, new(int64))
++	key := metricPart(model) + "|" + metricPart(channel) + "|" + metricPart(status)
++	v, loaded := m.RequestsTotal.LoadOrStore(key, new(int64))
++	if !loaded {
++		if atomic.AddInt64(&metricKeyCount, 1) > maxMetricKeys {
++			m.RequestsTotal.Delete(key)
++			atomic.AddInt64(&metricKeyCount, -1)
++			v, _ = m.RequestsTotal.LoadOrStore("other|other|other", new(int64))
++		}
++	}
+ 	addInt64(v.(*int64), 1)
+ }
+ 
+-// AddTokens 累加 token 计数。
++// AddTokens 累加 token 计数；负数用量不得回冲指标。
+ func (m *Metrics) AddTokens(kind string, n int64) {
+-	v, _ := m.TokensTotal.LoadOrStore(kind, new(int64))
++	if n < 0 {
++		return
++	}
++	v, _ := m.TokensTotal.LoadOrStore(metricPart(kind), new(int64))
+ 	addInt64(v.(*int64), n)
+ }
+ 

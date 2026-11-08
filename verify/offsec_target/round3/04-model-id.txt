@@ -1,0 +1,6 @@
+=== [D] /v1/models/{id...} 路径穿越与超长 ===
+  id=liquid/lfm-3-1.7b → HTTP 200
+  id=../../../etc/passwd → HTTP 404
+  id=liquid%2F..%2F..%2Fetc%2Fpasswd → HTTP 423
+  id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa → HTTP 423
+  id=liquid/lfm-3-1.7b?x=1 → HTTP 423
